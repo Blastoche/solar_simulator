@@ -1,0 +1,52 @@
+# ============================================================================
+# SOLAR SIMULATOR - REQUIREMENTS DÉVELOPPEMENT
+# ============================================================================
+# Installation : pip install -r requirements-dev.txt
+# Inclut automatiquement requirements.txt
+
+-r requirements.txt
+
+# ============================================================================
+# OUTILS DE DÉVELOPPEMENT
+# ============================================================================
+
+# Debugging
+django-debug-toolbar==4.4.6  # Barre de debug Django
+ipython==8.30.0  # Shell interactif amélioré
+ipdb==0.13.13  # Debugger IPython
+
+# Documentation
+sphinx==8.1.3  # Générateur de documentation
+sphinx-rtd-theme==3.0.2  # Thème ReadTheDocs
+sphinx-autodoc-typehints==2.5.0  # Type hints dans la doc
+
+# Tests avancés
+pytest-xdist==3.6.1  # Tests parallèles
+pytest-mock==3.14.0  # Mocking pour tests
+factory-boy==3.3.1  # Factories pour tests Django
+coverage==7.6.9  # Couverture de code avancée
+
+# Linting & Formatage
+pre-commit==4.0.1  # Hooks Git pre-commit
+isort==5.13.2  # Tri des imports
+autopep8==2.3.1  # Auto-formatage PEP8
+bandit==1.8.0  # Sécurité du code
+
+# Profiling
+django-silk==5.3.0  # Profiling des requêtes Django
+memory-profiler==0.61.0  # Profiling mémoire
+
+# Génération de fixtures
+django-seed==0.3.1  # Génération de données de test
+
+# ============================================================================
+# OUTILS OPTIONNELS
+# ============================================================================
+
+# Notebooks Jupyter (pour analyse de données)
+# jupyter==1.1.1
+# notebook==7.3.2
+# jupyterlab==4.3.3
+
+# Graph de dépendances
+# pipdeptree==2.23.4

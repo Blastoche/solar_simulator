@@ -1,0 +1,100 @@
+# ============================================================================
+# SOLAR SIMULATOR - REQUIREMENTS
+# ============================================================================
+# Python 3.10+ requis
+# Installation : pip install -r requirements.txt
+
+# ============================================================================
+# DJANGO & WEB FRAMEWORK
+# ============================================================================
+Django==4.2.18  # LTS version (support jusqu'en avril 2026)
+djangorestframework==3.15.2  # API REST (optionnel mais recommandé)
+
+# ============================================================================
+# BASE DE DONNÉES
+# ============================================================================
+psycopg2-binary==2.9.10  # PostgreSQL adapter
+
+# ============================================================================
+# CACHE & TÂCHES ASYNCHRONES
+# ============================================================================
+redis==5.2.1  # Client Redis
+celery==5.4.0  # Tâches asynchrones
+django-redis==5.4.0  # Backend Redis pour Django
+
+# ============================================================================
+# CALCULS SCIENTIFIQUES
+# ============================================================================
+numpy==1.26.4  # Calculs numériques
+pandas==2.2.3  # Manipulation de données
+scipy==1.14.1  # Algorithmes scientifiques (optimisation)
+
+# ============================================================================
+# CALCULS SOLAIRES (RECOMMANDÉ)
+# ============================================================================
+# pvlib-python==0.10.3  # Modèles solaires précis (décommenter pour Phase 2)
+# Actuellement nos modèles maison suffisent, mais pvlib est recommandé pour la précision
+
+# ============================================================================
+# APIS EXTERNES
+# ============================================================================
+requests==2.32.3  # Client HTTP pour APIs
+urllib3==2.2.3  # Dépendance de requests
+
+# ============================================================================
+# VISUALISATIONS
+# ============================================================================
+plotly==5.24.1  # Graphiques interactifs
+matplotlib==3.9.3  # Graphiques statiques
+seaborn==0.13.2  # Graphiques statistiques (optionnel)
+
+# ============================================================================
+# GÉNÉRATION DE RAPPORTS
+# ============================================================================
+reportlab==4.2.5  # Génération de PDF
+Pillow==11.0.0  # Manipulation d'images pour PDF
+openpyxl==3.1.5  # Export Excel
+weasyprint==63.1  # HTML vers PDF (alternative à ReportLab)
+
+# ============================================================================
+# FRONTEND & TEMPLATES
+# ============================================================================
+django-htmx==1.19.0  # Intégration HTMX
+django-widget-tweaks==1.5.0  # Amélioration des formulaires
+whitenoise==6.8.2  # Servir les fichiers statiques en production
+
+# ============================================================================
+# CONFIGURATION & ENVIRONNEMENT
+# ============================================================================
+python-dotenv==1.0.1  # Variables d'environnement (.env)
+python-decouple==3.8  # Alternative à dotenv (plus features)
+
+# ============================================================================
+# QUALITÉ DE CODE & DÉVELOPPEMENT
+# ============================================================================
+black==24.10.0  # Formatage de code
+flake8==7.1.1  # Linting
+pylint==3.3.2  # Analyse de code
+mypy==1.13.0  # Type checking
+pytest==8.3.4  # Tests unitaires
+pytest-django==4.9.0  # Tests Django
+pytest-cov==6.0.0  # Couverture de tests
+faker==33.1.0  # Données de test
+
+# ============================================================================
+# MONITORING & LOGGING (OPTIONNEL - PRODUCTION)
+# ============================================================================
+# sentry-sdk==2.18.0  # Monitoring d'erreurs
+# django-debug-toolbar==4.4.6  # Debug en développement
+
+# ============================================================================
+# SÉCURITÉ
+# ============================================================================
+django-cors-headers==4.6.0  # CORS (si API)
+django-csp==3.8  # Content Security Policy
+
+# ============================================================================
+# UTILITAIRES
+# ============================================================================
+pytz==2024.2  # Gestion des fuseaux horaires
+python-dateutil==2.9.0  # Manipulation de dates
