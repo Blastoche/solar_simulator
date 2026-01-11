@@ -7,7 +7,10 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 
-from solar_calc.models import SolarInstallation, ConsumptionProfile, Simulation
+from solar_calc.dataclasses.production import SolarInstallation
+from solar_calc.dataclasses.consumption import ConsumptionProfile
+from solar_calc.services.simulation import SimulationService
+
 from django.contrib.auth.models import User
 
 
