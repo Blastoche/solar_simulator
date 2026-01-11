@@ -244,26 +244,113 @@ print(f"Production : {production:,.0f} kWh/an")
 ## 🏗 Architecture
 
 ```
-solar_simulator/
-├── config/               # Configuration Django
-├── core/                 # Fonctionnalités communes
-├── weather/             # Collecte données météo (PVGIS, OpenWeather)
-├── solar_calc/          # Calculs de production et consommation
-│   ├── models/
-│   │   ├── consumption.py    ✅ Modèles de consommation
-│   │   └── production.py     ✅ Modèles de production
-│   ├── services/             ⏳ Services de simulation
-│   └── models.py             ⏳ Modèles Django
-├── financial/           # Calculs financiers (ROI, VAN, etc.)
-├── battery/             # Stockage batterie (futur)
-├── reporting/           # Génération de rapports PDF
-└── frontend/            # Interfaces utilisateur
-```
+solar_simulator/                    ← RACINE DU PROJET
+│
+├── 📄 requirements.txt             ← À LA RACINE
+├── 📄 requirements-dev.txt         ← À LA RACINE
+├── 📄 .env.example                 ← À LA RACINE
+├── 📄 .env                         ← À LA RACINE (à créer, pas versionné)
+├── 📄 .gitignore                   ← À LA RACINE
+├── 📄 README.md                    ← À LA RACINE
+├── 📄 manage.py                    ← À LA RACINE (créé par Django)
 
-**Légende :**
-- ✅ Implémenté
-- ⏳ En cours
-- ⬜ À faire
+│
+├── 📂 venv/                        ← Environnement virtuel (ignoré par git)
+│
+├── 📂 docs/                        # DOCUMENTATION (optionnel)
+│   ├── structure.py                
+│   ├── architecture.py             
+│   ├── etat_simulateur.md          
+│   └── guide_windows.md
+│
+├── 📂 static/                      # Fichiers statiques globaux
+│   ├── css/
+│   ├── js/
+│   └── images/
+│
+├── 📂 media/                       # Uploads utilisateurs (créé auto)
+│
+├── 📂 reports_output/              # Rapports PDF générés (créé auto)
+│
+├── 📂 logs/                        # Fichiers de logs (créé auto)
+│
+├── 📂 config/                      # CONFIGURATION DJANGO
+│   ├── __init__.py
+│   ├── settings.py                 # Settings principal
+│   ├── urls.py                     # URLs racine
+│   ├── wsgi.py
+│   └── asgi.py
+│
+├── 📂 core/                        # APP CORE
+│   ├── management/
+│	 │   ├── __init__.py
+│   │   ├── commands/               # Commandes Django custom 
+│   └── tests/
+│       ├── __init__.py
+│
+├── 📂 weather/                     # APP WEATHER
+│   ├── models.py                   # Modèles Django (WeatherData, etc.)
+│   ├── admin.py
+│   ├── services/                   # Services API
+│   │   ├── __init__.py
+│   │   ├── pvgis.py                # Client PVGIS
+│   │   ├── __pycache__/             
+│   ├── templates/
+│   ├── migrations/
+│   └── tests/
+│       ├── __init__.py
+│
+├── 📂 solar_calc/                  # APP SOLAR_CALC
+│   ├── models.py                   # Modèles Django ORM
+│   ├── admin.py
+│   ├── dataclasses/                # Modèles de calcul (dataclasses)
+│   │   ├── __init__.py
+│   │   ├── consumption.py          # ✅ TON FICHIER ENRICHI
+│   │   └── production.py           # ✅ TON FICHIER CRÉÉ
+│   ├── services/                   # Services métier
+│   │   ├── __init__.py
+│   │   ├── simulation.py           # Orchestration simulation
+│   ├── migrations/                
+│   └── tests/
+│       ├── __init__.py
+│
+├── 📂 battery/                     # APP BATTERY (future)
+│   ├── __init__.py
+│   ├── models.py
+│   ├── services/
+│   │   └── battery_simulation.py
+│   └── tests/
+│
+├── 📂 financial/                   # APP FINANCIAL
+│   ├── services/                   
+│   ├── templates/                   
+│   └── tests/
+│
+├── 📂 reporting/                   # APP REPORTING
+│   ├── services/                   
+│   ├── templates/                   
+│   └── tests/
+│
+├── 📂 frontend/                    # APP FRONTEND
+│   ├── views.py                    # Vues principales
+│   ├── urls.py
+│   ├── templates/                  # Templates HTML
+│   │   ├── base.html               # Template de base
+│   │   ├── frontend/
+│   │   ├── home.html               # Page d'accueil
+│   ├── static/                     # Fichiers statiques de l'app
+│   │   └── frontend/
+│   │       ├── css/
+│   │       ├── js/
+│   │       └── images/
+│   └── tests/
+│
+└── 📂 tests/                       # TESTS GLOBAUX (optionnel)
+    ├── test_pvgis.py
+    ├── test_pvgis_simple.py               
+    └── test_pvgis_v53_discovery.py
+    ├── test_simulation.py
+
 
 ### Modules Principaux
 
