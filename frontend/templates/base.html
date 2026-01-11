@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Simulateur solaire photovoltaïque - Estimez votre production et vos économies">
+    <title>{% block title %}Solar Simulator - Simulateur Solaire Photovoltaïque{% endblock %}</title>
+    
+    <!-- Tailwind CSS via CDN (pour démarrage rapide) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Alpine.js pour interactions légères -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- HTMX pour interactivité AJAX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    
+    <!-- Font Awesome pour les icônes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        /* Animations personnalisées */
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        /* Gradient animé pour le hero */
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .gradient-animate {
+            background-size: 200% 200%;
+            animation: gradient 15s ease infinite;
+        }
+        
+        /* Glassmorphism */
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        /* Smooth scroll */
+        html {
+            scroll-behavior: smooth;
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="fixed w-full bg-white/90 backdrop-blur-md shadow-sm z-50">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <!-- Logo -->
+                <a href="/" class="flex items-center space-x-2">
+                    <i class="fas fa-solar-panel text-3xl text-yellow-500"></i>
+                    <span class="text-2xl font-bold bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">
+                        Solar Simulator
+                    </span>
+                </a>
+                
+                <!-- Menu Desktop -->
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="/#comment-ca-marche" class="text-gray-700 hover:text-yellow-600 transition">Comment ça marche</a>
+                    <a href="/#tarifs" class="text-gray-700 hover:text-yellow-600 transition">Tarifs</a>
+                    <a href="/simulateur/gratuit" class="px-6 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg hover:shadow-lg transition transform hover:scale-105">
+                        Simuler gratuitement
+                    </a>
+                </div>
+                
+                <!-- Menu Mobile (burger) -->
+                <button class="md:hidden text-gray-700" onclick="toggleMobileMenu()">
+                    <i class="fas fa-bars text-2xl"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Menu Mobile -->
+        <div id="mobile-menu" class="hidden md:hidden bg-white border-t">
+            <div class="container mx-auto px-4 py-4 space-y-4">
+                <a href="/#comment-ca-marche" class="block text-gray-700 hover:text-yellow-600">Comment ça marche</a>
+                <a href="/#tarifs" class="block text-gray-700 hover:text-yellow-600">Tarifs</a>
+                <a href="/simulateur/gratuit" class="block px-6 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg text-center">
+                    Simuler gratuitement
+                </a>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Contenu Principal -->
+    <main class="pt-20">
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white mt-20">
+        <div class="container mx-auto px-4 py-12">
+            <div class="grid md:grid-cols-4 gap-8">
+                <!-- Colonne 1 : À propos -->
+                <div>
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-solar-panel text-yellow-500 mr-2"></i>
+                        Solar Simulator
+                    </h3>
+                    <p class="text-gray-400">
+                        Simulez votre installation solaire avec des données satellitaires précises.
+                    </p>
+                </div>
+                
+                <!-- Colonne 2 : Liens -->
+                <div>
+                    <h4 class="font-semibold mb-4">Navigation</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="/" class="hover:text-yellow-500 transition">Accueil</a></li>
+                        <li><a href="/simulateur/gratuit" class="hover:text-yellow-500 transition">Simulation gratuite</a></li>
+                        <li><a href="/simulateur/avancé" class="hover:text-yellow-500 transition">Simulation avancée</a></li>
+                    </ul>
+                </div>
+                
+                <!-- Colonne 3 : Légal -->
+                <div>
+                    <h4 class="font-semibold mb-4">Légal</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="/mentions-legales" class="hover:text-yellow-500 transition">Mentions légales</a></li>
+                        <li><a href="/cgv" class="hover:text-yellow-500 transition">CGV</a></li>
+                        <li><a href="/confidentialite" class="hover:text-yellow-500 transition">Confidentialité</a></li>
+                    </ul>
+                </div>
+                
+                <!-- Colonne 4 : Contact -->
+                <div>
+                    <h4 class="font-semibold mb-4">Contact</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><i class="fas fa-envelope mr-2"></i>contact@solar-simulator.fr</li>
+                        <li><i class="fas fa-phone mr-2"></i>+33 1 23 45 67 89</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Copyright -->
+            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+                <p>&copy; 2024 Solar Simulator. Tous droits réservés. Données PVGIS.</p>
+            </div>
+        </div>
+    </footer>
+    
+    <!-- Scripts -->
+    <script>
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+            menu.classList.toggle('hidden');
+        }
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
