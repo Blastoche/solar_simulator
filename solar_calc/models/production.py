@@ -208,7 +208,7 @@ class DonneesMeteo:
 
 
 @dataclass
-class SolarInstallation:
+class InstallationSolaire:
     """
     Configuration complète d'une installation solaire.
     """
@@ -311,44 +311,44 @@ class SolarInstallation:
             'pertes_totales_pct': round((1 - self.facteur_pertes_total) * 100, 2)
         }
     
-    def simuler_annee(self, meteo: pd.DataFrame) -> pd.DataFrame:
+    def simuler_annee(
+        self,
+        donnees_meteo_annuelles: pd.DataFrame,
+        annee_exploitation: int = 0
+    ) -> pd.DataFrame:
         """
-        Simule la production AC horaire.
+        Simule la production sur une année complète (8760 heures).
+        
+        Args:
+            donnees_meteo_annuelles: DataFrame avec données météo horaires
+            annee_exploitation: Année d'exploitation
+            
+        Returns:
+            pd.DataFrame: Production horaire sur l'année
         """
-        df = meteo.copy()
-
-        # Puissance crête totale
-        puissance_kwc = (
-            self.nombre_panneaux *
-            self.panneaux.puissance_crete_wc / 1000
-        )
-
-        # Rendement global
-        performance_ratio = 0.80
-
-        # Conversion irradiance → puissance DC
-        df['irradiance_poa_wm2'] = df['ghi']
-        df['puissance_dc_kw'] = (
-            df['irradiance_poa_wm2'] / 1000
-            * puissance_kwc
-        )
-
-        # Température (pertes thermiques simples)
-        perte_temp = 1 - 0.004 * (df['temperature'] - 25)
-        perte_temp = perte_temp.clip(lower=0.85, upper=1.05)
-
-        df['puissance_dc_kw'] *= perte_temp
-
-        # Conversion DC → AC
-        df['puissance_ac_kw'] = (
-            df['puissance_dc_kw']
-            * performance_ratio
-        )
-
-        df['puissance_ac_kw'] = df['puissance_ac_kw'].clip(lower=0)
-
-        return df[['timestamp', 'puissance_ac_kw']]
-
+        resultats = []
+        
+        for _, row in donnees_meteo_annuelles.iterrows():
+            meteo = DonneesMeteo(
+                timestamp=row['timestamp'],
+                irradiance_ghi=row.get('ghi', 0),
+                irradiance_dni=row.get('dni'),
+                irradiance_dhi=row.get('dhi'),
+                temperature_ambiante=row.get('temperature', 25),
+                vitesse_vent=row.get('vitesse_vent', 0),
+                couverture_nuageuse=row.get('couverture_nuageuse', 0)
+            )
+            
+            production = self.calculer_production_instantanee(meteo, annee_exploitation)
+            production['timestamp'] = meteo.timestamp
+            resultats.append(production)
+        
+        df_production = pd.DataFrame(resultats)
+        
+        # Calculer la production cumulée
+        df_production['energie_ac_kwh'] = df_production['puissance_ac_kw']
+        
+        return df_production
     
     def production_annuelle_estimee(
         self,
@@ -389,12 +389,12 @@ class SolarInstallation:
         return round(production_annuelle, 2)
 
 
-def creer_installation_standard() -> SolarInstallation:
+def creer_installation_standard() -> InstallationSolaire:
     """
     Crée une installation solaire standard française (résidentiel).
     
     Returns:
-        SolarInstallation: Installation de 3 kWc en toiture
+        InstallationSolaire: Installation de 3 kWc en toiture
     """
     panneaux = CaracteristiquesPanneau(
         modele="JS-500M",
@@ -424,7 +424,7 @@ def creer_installation_standard() -> SolarInstallation:
         facteur_ombrage=0.95  # Léger ombrage
     )
     
-    return SolarInstallation(
+    return InstallationSolaire(
         nom_installation="Installation résidentielle standard 3kWc",
         panneaux=panneaux,
         nombre_panneaux=nombre_panneaux,
