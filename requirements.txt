@@ -27,7 +27,7 @@ django-redis==5.4.0  # Backend Redis pour Django
 # ============================================================================
 numpy==1.26.4  # Calculs numériques
 pandas==2.2.3  # Manipulation de données
-scipy==1.14.1  # Algorithmes scientifiques (optimisation)
+# scipy==1.14.1  # Algorithmes scientifiques (optimisation)
 
 # ============================================================================
 # CALCULS SOLAIRES (RECOMMANDÉ)
@@ -59,9 +59,13 @@ weasyprint==63.1  # HTML vers PDF (alternative à ReportLab)
 # ============================================================================
 # FRONTEND & TEMPLATES
 # ============================================================================
+django-crispy-forms==2.1
+crispy-tailwind==0.5.0  # Intégration Tailwind avec crispy
 django-htmx==1.19.0  # Intégration HTMX
 django-widget-tweaks==1.5.0  # Amélioration des formulaires
 whitenoise==6.8.2  # Servir les fichiers statiques en production
+gunicorn==21.2.0  # Serveur WSGI pour la production
+
 
 # ============================================================================
 # CONFIGURATION & ENVIRONNEMENT
@@ -98,3 +102,4 @@ django-csp==3.8  # Content Security Policy
 # ============================================================================
 pytz==2024.2  # Gestion des fuseaux horaires
 python-dateutil==2.9.0  # Manipulation de dates
+
