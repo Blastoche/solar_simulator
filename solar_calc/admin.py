@@ -6,7 +6,8 @@ Configuration de l'interface d'administration Django pour solar_calc.
 from django.contrib import admin
 
 # Modèles Django ORM
-from .models import SolarInstallationModel, ConsumptionProfileModel, SimulationModel
+from frontend.models import Installation, Resultat, Simulation
+from solar_calc.models import ConsumptionProfileModel, SimulationModel, SolarInstallationModel
 
 # Dataclasses (si utilisées dans l’admin pour calculs ou affichages)
 from .dataclasses import SolarInstallation, ConsumptionProfile
@@ -22,6 +23,8 @@ class SolarInstallationAdmin(admin.ModelAdmin):
         'user',
         'puissance_crete_kwc',
         'nombre_panneaux',
+        'orientation',
+        'inclinaison',
         'latitude',
         'longitude',
         'created_at',
@@ -53,8 +56,13 @@ class SolarInstallationAdmin(admin.ModelAdmin):
             'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
+        
     )
     
+    def has_delete_permission(self, request, obj=None):
+        """Empêcher la suppression accidentelle"""
+        return request.user.is_superuse
+
     def puissance_crete_kwc(self, obj):
         """Affiche la puissance crête calculée."""
         return f"{obj.puissance_crete_kwc:.2f} kWc"
