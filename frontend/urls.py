@@ -41,4 +41,24 @@ urlpatterns = [
     path('simulateur-avance/', 
          views.SimulateurAvanceView.as_view(), 
          name='simulateur_avance'),
+
+     # Calculateur de consommation
+     path('consommation/calculateur/', 
+          views.ConsumptionCalculatorView.as_view(), 
+          name='consumption_calculator'),
+     path('consommation/calculer/', 
+          views.consumption_calculate, 
+          name='consumption_calculate'),
+     path('consommation/<int:consommation_id>/resultat/', 
+     views.ConsumptionResultView.as_view(), 
+     name='consumption_result'),
+path('consommation/<int:consommation_id>/details/', 
+     views.ConsumptionDetailsView.as_view(), 
+     name='consumption_details'),
+
+     # === MODE EXPERT ===
+    path('consommation/expert/calculateur/', views.consumption_calculator_expert, name='consumption_calculator_expert'),
+    path('consommation/expert/calculer/', views.consumption_calculate_expert, name='consumption_calculate_expert'),
+    path('consommation/expert/<int:consommation_id>/resultat/', views.ConsumptionExpertResultView.as_view(), name='consumption_result_expert'),
+    path('consommation/expert/<int:consommation_id>/details/', views.ConsumptionExpertDetailsView.as_view(), name='consumption_expert_details'),
 ]

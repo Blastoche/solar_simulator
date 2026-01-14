@@ -1,0 +1,35 @@
+<!-- frontend/templates/frontend/simulation/progress_bar.html -->
+<!-- Partial template pour HTMX - Mis à jour toutes les 2 secondes -->
+
+<div class="mb-6">
+    <div class="flex justify-between items-center mb-2">
+        <span class="text-sm font-semibold text-gray-700">Progression</span>
+        <span class="text-sm font-semibold {% if percentage == 100 %}text-green-600{% else %}text-blue-600{% endif %}">
+            {{ percentage|floatformat:0 }}%
+        </span>
+    </div>
+    <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+        <div class="progress-bar h-4 rounded-full transition-all duration-500 {% if percentage == 100 %}bg-gradient-to-r from-green-400 to-emerald-500{% else %}bg-gradient-to-r from-blue-500 to-purple-500{% endif %}" 
+             style="width: {{ percentage }}%">
+        </div>
+    </div>
+</div>
+
+<div class="text-center">
+    {% if state == 'SUCCESS' %}
+        <div class="text-green-600 font-semibold">
+            <i class="fas fa-check-circle mr-2"></i>
+            {{ message }}
+        </div>
+    {% elif state == 'FAILURE' %}
+        <div class="text-red-600 font-semibold">
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            {{ message }}
+        </div>
+    {% else %}
+        <div class="text-gray-600">
+            <i class="fas fa-spinner animate-spin mr-2"></i>
+            {{ message }}
+        </div>
+    {% endif %}
+</div>

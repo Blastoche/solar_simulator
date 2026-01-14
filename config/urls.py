@@ -21,19 +21,27 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.http import JsonResponse
 
 urlpatterns = [
     # Admin Django
     path('admin/', admin.site.urls),
     
-    # Frontend (site public)
-    path('', include('frontend.urls')),
+    # 🆕 Routes du frontend (à la racine)
+    # Donc: localhost:8000/ → home
+    #       localhost:8000/simulation/ → formulaire
+    #       localhost:8000/simulation/xxx/resultats/ → résultats
+    path('', include('frontend.urls', namespace='frontend')),
     
-    # Si tu veux une API REST plus tard
-    # path('api/', include('api.urls')),
+    # 🆕 APIs REST (pour futur)
+    path('api/', include('rest_framework.urls')),
+    
+    # 🆕 Health check (pour monitoring/devops)
+    # GET /health/ → {'status': 'ok'}
+    path('health/', lambda r: JsonResponse({'status': 'ok'})),
 ]
 
-# Servir les fichiers media en développement
+# 🆕 En développement, servir les fichiers uploadés
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

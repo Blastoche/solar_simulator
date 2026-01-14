@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+
+{% block title %}Résultats de Simulation - Solar Simulator{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        background: white;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 20px 0 rgba(0, 0, 0, 0.1);
+    }
+    
+    .chart-container {
+        background: white;
+        border-radius: 1rem;
+        padding: 2rem;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        margin-bottom: 2rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-12">
+    <div class="container mx-auto px-4">
+        
+        <!-- Header avec animation de succès -->
+        <div class="text-center mb-12">
+            <div class="inline-block mb-4">
+                <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center animate-bounce">
+                    <i class="fas fa-check text-4xl text-green-600"></i>
+                </div>
+            </div>
+            <h1 class="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                ✅ Votre Simulation est Prête !
+            </h1>
+            <p class="text-xl text-gray-600">
+                Voici les résultats détaillés de votre installation solaire
+            </p>
+        </div>
+        
+        <!-- Indicateurs clés (KPIs) -->
+        <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+            <!-- Production annuelle -->
+            <div class="stat-card border-l-4 border-yellow-500">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-gray-600 text-sm font-semibold">Production Annuelle</span>
+                    <i class="fas fa-solar-panel text-yellow-500 text-2xl"></i>
+                </div>
+                <div class="text-3xl font-bold text-gray-800">
+                    {{ simulation.resultat.production_annuelle_kwh|floatformat:0 }}
+                </div>
+                <div class="text-sm text-gray-500">kWh/an</div>
+            </div>
+            
+            <!-- Autoconsommation -->
+            <div class="stat-card border-l-4 border-green-500">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-gray-600 text-sm font-semibold">Autoconsommation</span>
+                    <i class="fas fa-home text-green-500 text-2xl"></i>
+                </div>
+                <div class="text-3xl font-bold text-gray-800">
+                    {{ simulation.resultat.autoconsommation_ratio|floatformat:0 }}
+                </div>
+                <div class="text-sm text-gray-500">%</div>
+            </div>
+            
+            <!-- Économies annuelles -->
+            <div class="stat-card border-l-4 border-blue-500">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-gray-600 text-sm font-semibold">Économies/an</span>
+                    <i class="fas fa-piggy-bank text-blue-500 text-2xl"></i>
+                </div>
+                <div class="text-3xl font-bold text-gray-800">
+                    {{ simulation.resultat.economie_annuelle_euros|floatformat:0 }}
+                </div>
+                <div class="text-sm text-gray-500">€</div>
+            </div>
+            
+            <!-- ROI 25 ans -->
+            <div class="stat-card border-l-4 border-purple-500">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-gray-600 text-sm font-semibold">ROI 25 ans</span>
+                    <i class="fas fa-chart-line text-purple-500 text-2xl"></i>
+                </div>
+                <div class="text-3xl font-bold text-gray-800">
+                    {{ simulation.resultat.roi_25ans_euros|floatformat:0 }}
+                </div>
+                <div class="text-sm text-gray-500">€</div>
+            </div>
+        </div>
+        
+        <!-- Graphique 1 : Production vs Consommation Mensuelle -->
+        <div class="chart-container">
+            <h2 class="text-2xl font-bold mb-4 flex items-center">
+                <i class="fas fa-chart-bar text-blue-600 mr-3"></i>
+                Production vs Consommation Mensuelle
+            </h2>
+            <div id="monthly-chart" style="height: 400px;"></div>
+        </div>
+        
+        <!-- Graphique 2 : Profil Journalier Type -->
+        <div class="chart-container">
+            <h2 class="text-2xl font-bold mb-4 flex items-center">
+                <i class="fas fa-clock text-purple-600 mr-3"></i>
+                Profil Horaire Moyen
+            </h2>
+            <p class="text-gray-600 mb-4">
+                Courbe type d'une journée moyenne (production vs consommation)
+            </p>
+            <div id="daily-chart" style="height: 400px;"></div>
+        </div>
+        
+        <!-- Détails de l'installation -->
+        <div class="bg-white rounded-2xl shadow-lg p-8 mb-12">
+            <h2 class="text-2xl font-bold mb-6 flex items-center">
+                <i class="fas fa-info-circle text-blue-600 mr-3"></i>
+                Détails de l'Installation
+            </h2>
+            
+            <div class="grid md:grid-cols-2 gap-8">
+                <!-- Colonne 1 : Installation -->
+                <div>
+                    <h3 class="font-semibold text-lg mb-4 text-gray-700">🔧 Configuration Technique</h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Localisation</span>
+                            <span class="font-semibold">{{ installation.adresse|truncatewords:5 }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Coordonnées</span>
+                            <span class="font-semibold">{{ installation.latitude|floatformat:2 }}° / {{ installation.longitude|floatformat:2 }}°</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Puissance installée</span>
+                            <span class="font-semibold">{{ installation.puissance_kw }} kWc</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Orientation</span>
+                            <span class="font-semibold">{{ installation.get_orientation_display }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Inclinaison</span>
+                            <span class="font-semibold">{{ installation.inclinaison }}°</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Type de toiture</span>
+                            <span class="font-semibold">{{ installation.get_type_toiture_display }}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Colonne 2 : Consommation -->
+                <div>
+                    <h3 class="font-semibold text-lg mb-4 text-gray-700">🏠 Profil de Consommation</h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Consommation annuelle</span>
+                            <span class="font-semibold">{{ profil.consommation_annuelle|floatformat:0 }} kWh</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Taux d'autoconsommation</span>
+                            <span class="font-semibold text-green-600">{{ simulation.resultat.autoconsommation_ratio|floatformat:1 }}%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Surplus injecté</span>
+                            <span class="font-semibold">{{ simulation.resultat.injection_reseau_kwh|floatformat:0 }} kWh</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Actions -->
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="{% url 'frontend:simulation_pdf_download' simulation_id=simulation.id %}" 
+               class="px-8 py-4 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-xl hover:shadow-lg transition transform hover:scale-105 font-semibold text-center">
+                <i class="fas fa-file-pdf mr-2"></i>
+                Télécharger le Rapport PDF
+            </a>
+            
+            <a href="{% url 'frontend:simulation_excel_download' simulation_id=simulation.id %}" 
+               class="px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:shadow-lg transition transform hover:scale-105 font-semibold text-center">
+                <i class="fas fa-file-excel mr-2"></i>
+                Exporter en Excel
+            </a>
+            
+            <a href="{% url 'frontend:simulation_create' %}" 
+               class="px-8 py-4 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition font-semibold text-center">
+                <i class="fas fa-redo mr-2"></i>
+                Nouvelle Simulation
+            </a>
+        </div>
+        
+        <!-- Note PVGIS -->
+        <div class="mt-12 text-center text-sm text-gray-500">
+            <p>
+                <i class="fas fa-satellite-dish mr-1"></i>
+                Données d'irradiation solaire fournies par <strong>PVGIS</strong> (European Commission - JRC)
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Plotly pour les graphiques -->
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+<script>
+    // ============== GRAPHIQUE MENSUEL ==============
+    const monthlyData = [
+        {
+            x: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'],
+            y: {{ monthly_chart.production|safe }},
+            name: 'Production',
+            type: 'bar',
+            marker: {
+                color: '#f59e0b',
+                line: {
+                    color: '#d97706',
+                    width: 1
+                }
+            }
+        },
+        {
+            x: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'],
+            y: {{ monthly_chart.consommation|safe }},
+            name: 'Consommation',
+            type: 'bar',
+            marker: {
+                color: '#3b82f6',
+                line: {
+                    color: '#2563eb',
+                    width: 1
+                }
+            }
+        }
+    ];
+    
+    const monthlyLayout = {
+        title: {
+            text: '',
+            font: { size: 18 }
+        },
+        xaxis: {
+            title: 'Mois',
+            tickangle: -45
+        },
+        yaxis: {
+            title: 'Énergie (kWh)',
+            gridcolor: '#e5e7eb'
+        },
+        barmode: 'group',
+        bargap: 0.15,
+        bargroupgap: 0.1,
+        plot_bgcolor: '#f9fafb',
+        paper_bgcolor: 'white',
+        font: {
+            family: 'Inter, sans-serif',
+            size: 12,
+            color: '#374151'
+        },
+        legend: {
+            orientation: 'h',
+            y: -0.2,
+            x: 0.5,
+            xanchor: 'center'
+        },
+        margin: {
+            l: 60,
+            r: 30,
+            t: 30,
+            b: 80
+        }
+    };
+    
+    const monthlyConfig = {
+        responsive: true,
+        displayModeBar: true,
+        displaylogo: false,
+        modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+    };
+    
+    Plotly.newPlot('monthly-chart', monthlyData, monthlyLayout, monthlyConfig);
+    
+    // ============== GRAPHIQUE HORAIRE ==============
+    const dailyData = [
+        {
+            x: {{ daily_chart.x|safe }},
+            y: {{ daily_chart.production|safe }},
+            name: 'Production',
+            type: 'scatter',
+            mode: 'lines',
+            fill: 'tozeroy',
+            line: {
+                color: '#f59e0b',
+                width: 3,
+                shape: 'spline'
+            },
+            fillcolor: 'rgba(245, 158, 11, 0.2)'
+        },
+        {
+            x: {{ daily_chart.x|safe }},
+            y: {{ daily_chart.consommation|safe }},
+            name: 'Consommation',
+            type: 'scatter',
+            mode: 'lines',
+            fill: 'tozeroy',
+            line: {
+                color: '#3b82f6',
+                width: 3,
+                shape: 'spline'
+            },
+            fillcolor: 'rgba(59, 130, 246, 0.2)'
+        }
+    ];
+    
+    const dailyLayout = {
+        title: {
+            text: '',
+            font: { size: 18 }
+        },
+        xaxis: {
+            title: 'Heure de la journée',
+            tickmode: 'linear',
+            tick0: 0,
+            dtick: 2,
+            ticksuffix: 'h'
+        },
+        yaxis: {
+            title: 'Puissance (kW)',
+            gridcolor: '#e5e7eb'
+        },
+        plot_bgcolor: '#f9fafb',
+        paper_bgcolor: 'white',
+        font: {
+            family: 'Inter, sans-serif',
+            size: 12,
+            color: '#374151'
+        },
+        legend: {
+            orientation: 'h',
+            y: -0.2,
+            x: 0.5,
+            xanchor: 'center'
+        },
+        margin: {
+            l: 60,
+            r: 30,
+            t: 30,
+            b: 80
+        },
+        hovermode: 'x unified'
+    };
+    
+    const dailyConfig = {
+        responsive: true,
+        displayModeBar: true,
+        displaylogo: false,
+        modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+    };
+    
+    Plotly.newPlot('daily-chart', dailyData, dailyLayout, dailyConfig);
+    
+    // Responsive
+    window.addEventListener('resize', function() {
+        Plotly.Plots.resize('monthly-chart');
+        Plotly.Plots.resize('daily-chart');
+    });
+</script>
+{% endblock %}

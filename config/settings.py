@@ -28,10 +28,15 @@ DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost').split(',')
 
+# Default Auto Field (pour éviter les warnings AutoField)
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Application definition
 
 # Application definition
 
 INSTALLED_APPS = [
+    # Apps Django par défaut
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -39,24 +44,32 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     
+    # 🆕 PACKAGES EXTERNES nécessaires pour le frontend
+    'rest_framework',           # Pour futures APIs
+    'corsheaders',              # Gestion CORS (cross-origin)
+    'crispy_forms',             # Formulaires Django → HTML propre
+    'crispy_tailwind',          # Intégration Tailwind avec crispy
+
     # Apps du projet
     'core',
     'weather',
     'solar_calc',
     'financial',
     'reporting',
-    'frontend',
     # 'battery',  # Décommenter plus tard
+    'frontend',
+
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # 🆕 Avant CommonMiddleware
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'frontend.middleware.analytics.AnalyticsMiddleware',  # 🆕 Analytics personnalisé
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -66,9 +79,9 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
-            BASE_DIR / 'frontend' / 'templates',  # Ajouter cette ligne
+            BASE_DIR / 'frontend' / 'templates',  # 🆕 PRIORITAIRE
         ],
-        'APP_DIRS': True,
+        'APP_DIRS': True,  # ← Continue à chercher dans app/templates/
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
@@ -133,10 +146,39 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
-    BASE_DIR / 'static',
+    BASE_DIR / 'static',              # Fichiers statiques GLOBAUX
+    BASE_DIR / 'frontend' / 'static', # 🆕 Fichiers statiques du frontend
 ]
+STATIC_ROOT = BASE_DIR / 'staticfiles'  # 🆕 Pour `collectstatic` (production)
 
+# MEDIA FILES - 🆕 Pour les uploads utilisateurs
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# CELERY - 🆕 Configuration pour les tâches asynchrones
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'Europe/Paris'
+
+# CRISPY FORMS - 🆕 Pour styliser les formulaires
+CRISPY_ALLOWED_TEMPLATE_PACKS = "tailwind"
+CRISPY_TEMPLATE_PACK = "tailwind"
+
+# LOGGING - 🆕 Enregistrer les events importants
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': BASE_DIR / 'logs' / 'django.log',
+            'maxBytes': 1024 * 1024 * 15,  # 15MB max par fichier
+            'backupCount': 10,              # Garder 10 fichiers (15MB x 10 = 150MB max)
+        },
+    },
+}

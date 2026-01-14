@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}Simulation en cours - Solar Simulator{% endblock %}
+
+{% block extra_css %}
+<style>
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: .5;
+        }
+    }
+    
+    .animate-pulse {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    
+    @keyframes spin {
+        from {
+            transform: rotate(0deg);
+        }
+        to {
+            transform: rotate(360deg);
+        }
+    }
+    
+    .animate-spin {
+        animation: spin 1s linear infinite;
+    }
+    
+    .progress-bar {
+        transition: width 0.5s ease;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center py-12">
+    <div class="container mx-auto px-4">
+        <div class="max-w-2xl mx-auto">
+            <!-- Card principale -->
+            <div class="bg-white rounded-2xl shadow-2xl p-8 md:p-12">
+                <!-- Icône centrale animée -->
+                <div class="text-center mb-8">
+                    <div class="inline-block">
+                        <i class="fas fa-solar-panel text-6xl text-yellow-500 animate-pulse"></i>
+                    </div>
+                </div>
+                
+                <!-- Titre -->
+                <h1 class="text-3xl md:text-4xl font-bold text-center mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    ⏳ Simulation en cours...
+                </h1>
+                
+                <p class="text-center text-gray-600 mb-8">
+                    Nous calculons votre production solaire sur 8760 heures
+                </p>
+                
+                <!-- Barre de progression (mise à jour via HTMX) -->
+                <div id="progress-container" 
+                     hx-get="/api/progression/{{ task_id }}/"
+                     hx-trigger="every 2s"
+                     hx-swap="innerHTML">
+                    <!-- Contenu initial -->
+                    <div class="mb-6">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm font-semibold text-gray-700">Progression</span>
+                            <span class="text-sm font-semibold text-blue-600">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                            <div class="progress-bar bg-gradient-to-r from-blue-500 to-purple-500 h-4 rounded-full" 
+                                 style="width: 0%">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center text-gray-600">
+                        <i class="fas fa-spinner animate-spin mr-2"></i>
+                        Démarrage de la simulation...
+                    </div>
+                </div>
+                
+                <!-- Étapes de calcul -->
+                <div class="mt-12 space-y-4">
+                    <div class="flex items-start space-x-3 text-sm">
+                        <div class="flex-shrink-0 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-check text-green-600 text-xs"></i>
+                        </div>
+                        <div>
+                            <div class="font-semibold text-gray-800">Récupération des données PVGIS</div>
+                            <div class="text-gray-500">Données satellitaires d'irradiation solaire</div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-start space-x-3 text-sm">
+                        <div class="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-spinner animate-spin text-blue-600 text-xs"></i>
+                        </div>
+                        <div>
+                            <div class="font-semibold text-gray-800">Calcul de production horaire</div>
+                            <div class="text-gray-500">Simulation sur 8760 heures (1 an)</div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-start space-x-3 text-sm opacity-50">
+                        <div class="flex-shrink-0 w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-clock text-gray-400 text-xs"></i>
+                        </div>
+                        <div>
+                            <div class="font-semibold text-gray-800">Analyse d'autoconsommation</div>
+                            <div class="text-gray-500">Croisement production/consommation</div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-start space-x-3 text-sm opacity-50">
+                        <div class="flex-shrink-0 w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-clock text-gray-400 text-xs"></i>
+                        </div>
+                        <div>
+                            <div class="font-semibold text-gray-800">Calculs financiers</div>
+                            <div class="text-gray-500">ROI, économies, projection 25 ans</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Info -->
+                <div class="mt-8 bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                    <p class="text-sm text-blue-800">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        La simulation prend généralement entre <strong>30 secondes et 2 minutes</strong> selon la charge du serveur.
+                    </p>
+                </div>
+                
+                <!-- Debug info (masquée) -->
+                <div class="mt-4 text-xs text-gray-400 text-center">
+                    Simulation ID: {{ object.id }}<br>
+                    Task ID: {{ task_id }}
+                </div>
+                
+                <!-- Annulation (optionnel) -->
+                <div class="mt-6 text-center">
+                    <a href="{% url 'frontend:simulation_create' %}"
+                       class="text-gray-500 hover:text-gray-700 text-sm underline">
+                        Annuler et créer une nouvelle simulation
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    console.log('📊 Page de progression chargée');
+    console.log('Task ID:', '{{ task_id }}');
+    console.log('Simulation ID:', '{{ object.id }}');
+    
+    // Redirection automatique vers les résultats quand terminé
+    document.body.addEventListener('htmx:afterSwap', function(event) {
+        if (event.detail.target.id === 'progress-container') {
+            const content = event.detail.target.innerHTML;
+            console.log('🔄 Contenu mis à jour');
+            
+            // Vérifier si la simulation est terminée
+            if (content.includes('SUCCESS') || content.includes('100%')) {
+                console.log('✅ Simulation terminée ! Redirection dans 2s...');
+                setTimeout(function() {
+                    window.location.href = "{% url 'frontend:simulation_results' simulation_id=object.id %}";
+                }, 2000);
+            }
+            
+            // Vérifier si la simulation a échoué
+            if (content.includes('FAILURE') || content.includes('Erreur')) {
+                console.error('❌ La simulation a échoué');
+                alert('❌ La simulation a échoué. Veuillez réessayer.');
+            }
+        }
+    });
+    
+    // Log les erreurs HTMX
+    document.body.addEventListener('htmx:responseError', function(event) {
+        console.error('❌ Erreur HTMX:', event.detail);
+    });
+</script>
+{% endblock %}

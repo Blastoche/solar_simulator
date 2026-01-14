@@ -1,0 +1,589 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Calculateur de Consommation - Solar Simulator{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 py-12">
+    <div class="max-w-4xl mx-auto px-4">
+        
+        <!-- En-tête -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900 mb-4">
+                📊 Calculateur de Consommation Électrique
+            </h1>
+            <p class="text-lg text-gray-600">
+                Estimez votre consommation annuelle en quelques questions
+            </p>
+        </div>
+        
+        <!-- Sélecteur de mode -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <div class="flex gap-4 justify-center">
+                <button id="mode-rapide-btn" 
+                        class="mode-btn active px-6 py-3 rounded-lg font-semibold transition"
+                        onclick="setMode('rapide')">
+                    🚀 Mode Rapide (5 min)
+                </button>
+                <button id="mode-expert-btn" 
+                        class="mode-btn px-6 py-3 rounded-lg font-semibold transition"
+                        onclick="setMode('expert')"
+                        disabled
+                        title="Bientôt disponible">
+                    🔬 Mode Expert (15 min) - Bientôt
+                </button>
+            </div>
+        </div>
+        
+        <!-- Formulaire -->
+        <form id="consumption-form" method="post" action="{% url 'frontend:consumption_calculate' %}" class="bg-white rounded-xl shadow-lg p-8">
+            {% csrf_token %}
+            
+            <input type="hidden" name="mode" id="mode-input" value="rapide">
+            
+            <!-- Barre de progression -->
+            <div class="mb-8">
+                <div class="flex justify-between mb-2">
+                    <span class="text-sm font-semibold text-gray-600">Étape <span id="current-step">1</span> sur 8</span>
+                    <span class="text-sm font-semibold text-purple-600"><span id="progress-pct">13</span>%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-3">
+                    <div id="progress-bar" class="bg-gradient-to-r from-purple-500 to-blue-500 h-3 rounded-full transition-all duration-300" style="width: 13%"></div>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 1 : Informations Logement -->
+            <div class="step active" data-step="1">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                    <span class="bg-purple-100 text-purple-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">1</span>
+                    🏠 Votre logement
+                </h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Surface habitable (m²) <span class="text-red-500">*</span>
+                        </label>
+                        <input type="number" name="surface" required min="10" max="1000" value="100"
+                               class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Nombre de personnes <span class="text-red-500">*</span>
+                        </label>
+                        <input type="number" name="nb_personnes" required min="1" max="15" value="2"
+                               class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Année de construction
+                        </label>
+                        
+                        <!-- Toggle mode année/plage -->
+                        <div class="flex gap-2 mb-3">
+                            <button type="button" class="btn-toggle-year active px-4 py-2 rounded-lg text-sm font-semibold transition" data-mode="plage">
+                                Par période
+                            </button>
+                            <button type="button" class="btn-toggle-year px-4 py-2 rounded-lg text-sm font-semibold transition" data-mode="annee">
+                                Année exacte
+                            </button>
+                        </div>
+                        
+                        <!-- Mode plage (affiché par défaut) -->
+                        <select name="annee_construction_plage" id="plage-mode"
+                                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            <option value="2021">Depuis 2021 (RE2020)</option>
+                            <option value="2013">2013-2020 (RT2012)</option>
+                            <option value="2005">2005-2012 (RT2005)</option>
+                            <option value="1988" selected>1988-2004 (RT1988)</option>
+                            <option value="1974">1974-1987 (RT1974)</option>
+                            <option value="1900">Avant 1974</option>
+                        </select>
+                        
+                        <!-- Mode année exacte (caché par défaut) -->
+                        <input type="number" name="annee_construction_exacte" id="annee-mode" 
+                               placeholder="Ex: 1995" min="1900" max="2024" style="display:none;"
+                               class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            DPE (étiquette énergétique) <span class="text-red-500">*</span>
+                        </label>
+                        <select name="dpe" required
+                                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            <option value="A">A - Très performant (< 50 kWh/m²/an)</option>
+                            <option value="B">B - Performant (50-90 kWh/m²/an)</option>
+                            <option value="C">C - Assez performant (91-150 kWh/m²/an)</option>
+                            <option value="D" selected>D - Moyen (151-230 kWh/m²/an)</option>
+                            <option value="E">E - Médiocre (231-330 kWh/m²/an)</option>
+                            <option value="F">F - Énergivore (331-450 kWh/m²/an)</option>
+                            <option value="G">G - Très énergivore (> 450 kWh/m²/an)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Coordonnées (cachées, récupérées du formulaire principal) -->
+                <input type="hidden" name="latitude" value="48.8566">
+                <input type="hidden" name="longitude" value="2.3522">
+            </div>
+            
+            <!-- ÉTAPE 2 : Chauffage -->
+            <div class="step" data-step="2">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                    <span class="bg-purple-100 text-purple-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">2</span>
+                    🔥 Chauffage
+                </h2>
+                
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Type de chauffage principal <span class="text-red-500">*</span>
+                        </label>
+                        <select name="type_chauffage" required
+                                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            <option value="electrique">Électrique (convecteurs, radiateurs)</option>
+                            <option value="pac">Pompe à chaleur (PAC)</option>
+                            <option value="gaz">Gaz</option>
+                            <option value="fioul">Fioul</option>
+                            <option value="bois">Bois / Granulés</option>
+                            <option value="autre">Autre</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Température de consigne (hiver)
+                        </label>
+                        <input type="number" name="temperature_consigne" min="15" max="25" value="19" step="0.5"
+                               class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                        <p class="text-xs text-gray-500 mt-1">💡 Recommandé : 19°C (1°C de moins = 7% d'économie)</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Type de VMC
+                        </label>
+                        <select name="type_vmc"
+                                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            <option value="simple_flux">Simple flux</option>
+                            <option value="double_flux">Double flux (récupération chaleur)</option>
+                            <option value="aucune">Aucune</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 3 : Eau Chaude Sanitaire -->
+            <div class="step" data-step="3">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                    <span class="bg-purple-100 text-purple-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">3</span>
+                    🚿 Eau chaude sanitaire
+                </h2>
+                
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Type de production d'eau chaude <span class="text-red-500">*</span>
+                        </label>
+                        <select name="type_ecs" required
+                                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            <option value="ballon_electrique">Ballon électrique</option>
+                            <option value="chauffe_eau_thermodynamique">Chauffe-eau thermodynamique</option>
+                            <option value="gaz">Gaz (chaudière ou chauffe-eau)</option>
+                            <option value="solaire">Solaire thermique + appoint</option>
+                            <option value="autre">Autre</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Capacité du ballon (litres)
+                        </label>
+                        <input type="number" name="capacite_ecs" min="50" max="500" value="200" step="50"
+                               class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                        <p class="text-xs text-gray-500 mt-1">💡 Recommandé : 50L par personne</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 4 : Électroménager -->
+            <div class="step" data-step="4">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                    <span class="bg-purple-100 text-purple-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">4</span>
+                    🧺 Électroménager
+                </h2>
+                
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Âge moyen de vos appareils
+                        </label>
+                        <select name="age_appareils"
+                                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            <option value="recent">Récent (< 5 ans, classe A+++)</option>
+                            <option value="moyen" selected>Moyen (5-10 ans)</option>
+                            <option value="ancien">Ancien (> 10 ans)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 5 : Cuisson -->
+            <div class="step" data-step="5">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                    <span class="bg-purple-100 text-purple-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">5</span>
+                    🍳 Cuisson
+                </h2>
+                
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Type de plaques de cuisson <span class="text-red-500">*</span>
+                        </label>
+                        <select name="type_cuisson" required
+                                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            <option value="induction">Induction</option>
+                            <option value="electrique">Électrique classique</option>
+                            <option value="gaz">Gaz</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 6 : Audiovisuel (NOUVELLE VERSION 3 NIVEAUX) -->
+            <div class="step" data-step="6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                    <span class="bg-purple-100 text-purple-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">6</span>
+                    📺 Audiovisuel & Multimédia
+                </h2>
+                
+                <div>
+                    <label class="block text-lg font-semibold text-gray-700 mb-4">
+                        Usage audiovisuel
+                        <span class="text-purple-600 cursor-help ml-1" title="Choisissez selon vos équipements">ℹ️</span>
+                    </label>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- Usage Modéré -->
+                        <label class="usage-card border-2 rounded-xl p-5 cursor-pointer transition-all hover:shadow-lg">
+                            <input type="radio" name="usage_audiovisuel" value="modere" class="hidden">
+                            <div class="text-center">
+                                <div class="text-3xl mb-3">🟢</div>
+                                <div class="font-bold text-lg mb-2">Modéré</div>
+                                <div class="text-sm text-gray-600 mb-3">~150 kWh/pers/an</div>
+                                <div class="text-xs text-left text-gray-500 space-y-1">
+                                    <div><strong>Équipements :</strong></div>
+                                    <div>• Petite TV (&lt;42")</div>
+                                    <div>• Box internet</div>
+                                    <div>• 1 ordinateur</div>
+                                    <div>• Peu d'appareils en veille</div>
+                                </div>
+                            </div>
+                        </label>
+                        
+                        <!-- Usage Courant -->
+                        <label class="usage-card border-2 rounded-xl p-5 cursor-pointer transition-all hover:shadow-lg">
+                            <input type="radio" name="usage_audiovisuel" value="courant" checked class="hidden">
+                            <div class="text-center">
+                                <div class="text-3xl mb-3">🟡</div>
+                                <div class="font-bold text-lg mb-2">Courant</div>
+                                <div class="text-sm text-gray-600 mb-3">~250 kWh/pers/an</div>
+                                <div class="text-xs text-left text-gray-500 space-y-1">
+                                    <div><strong>Équipements :</strong></div>
+                                    <div>• TV moyenne (42-55")</div>
+                                    <div>• Box + Décodeur</div>
+                                    <div>• Ordinateur</div>
+                                    <div>• Console occasionnelle</div>
+                                </div>
+                            </div>
+                        </label>
+                        
+                        <!-- Usage Intensif -->
+                        <label class="usage-card border-2 rounded-xl p-5 cursor-pointer transition-all hover:shadow-lg">
+                            <input type="radio" name="usage_audiovisuel" value="intensif" class="hidden">
+                            <div class="text-center">
+                                <div class="text-3xl mb-3">🔴</div>
+                                <div class="font-bold text-lg mb-2">Intensif</div>
+                                <div class="text-sm text-gray-600 mb-3">~400 kWh/pers/an</div>
+                                <div class="text-xs text-left text-gray-500 space-y-1">
+                                    <div><strong>Équipements :</strong></div>
+                                    <div>• Grande TV (>65")</div>
+                                    <div>• Console souvent allumée</div>
+                                    <div>• Home-cinéma</div>
+                                    <div>• Appareils en veille permanente</div>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 7 : Éclairage -->
+            <div class="step" data-step="7">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                    <span class="bg-purple-100 text-purple-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">7</span>
+                    💡 Éclairage
+                </h2>
+                
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Type d'ampoules principal <span class="text-red-500">*</span>
+                        </label>
+                        <select name="type_eclairage" required
+                                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            <option value="LED" selected>LED (économiques)</option>
+                            <option value="mixte">Mixte (LED + halogène)</option>
+                            <option value="halogen">Halogène</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">💡 Les LED consomment 5× moins que les halogènes</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 8 : Contrat Électricité (NOUVELLE) -->
+            <div class="step" data-step="8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                    <span class="bg-purple-100 text-purple-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">8</span>
+                    ⚡ Votre Contrat Électricité
+                </h2>
+                
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Puissance de votre compteur <span class="text-red-500">*</span>
+                        </label>
+                        <select name="puissance_compteur" required
+                                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            <option value="3kVA">3 kVA (studio, petit appartement)</option>
+                            <option value="6kVA" selected>6 kVA (standard, maison ou appartement)</option>
+                            <option value="9kVA">9 kVA (grande maison)</option>
+                            <option value="12kVA">12 kVA (chauffage élec + gros besoins)</option>
+                            <option value="15kVA">15 kVA (très gros besoins)</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">💡 Regardez sur votre facture ou votre compteur Linky</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">
+                            Type de contrat <span class="text-red-500">*</span>
+                        </label>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Tarif Base -->
+                            <label class="contract-card border-2 rounded-xl p-5 cursor-pointer transition-all hover:shadow-lg">
+                                <input type="radio" name="type_contrat" value="base" checked class="hidden">
+                                <div class="text-center">
+                                    <div class="font-bold text-lg mb-2">Tarif Base</div>
+                                    <div class="text-sm text-gray-600 mb-3">Prix unique 24h/24</div>
+                                    <div class="text-2xl font-bold text-purple-600">0.2516 €/kWh</div>
+                                </div>
+                            </label>
+                            
+                            <!-- Tarif HP/HC -->
+                            <label class="contract-card border-2 rounded-xl p-5 cursor-pointer transition-all hover:shadow-lg">
+                                <input type="radio" name="type_contrat" value="hphc" class="hidden">
+                                <div class="text-center">
+                                    <div class="font-bold text-lg mb-2">Tarif HP/HC</div>
+                                    <div class="text-sm text-gray-600 mb-3">Heures Pleines / Creuses</div>
+                                    <div class="text-lg font-bold">
+                                        <span class="text-red-600">HP: 0.2700 €</span><br>
+                                        <span class="text-green-600">HC: 0.2068 €</span>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                        
+                        <div class="mt-4 bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <span class="text-blue-600 text-xl">💡</span>
+                                </div>
+                                <div class="ml-3 text-sm text-blue-700">
+                                    <strong>Astuce HP/HC :</strong><br>
+                                    HC = 22h-6h (8h/nuit)<br>
+                                    Économie possible si vous programmez vos appareils (lave-linge, chauffe-eau) la nuit
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Boutons navigation -->
+            <div class="flex justify-between mt-8">
+                <button type="button" id="prev-btn" 
+                        class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition"
+                        style="display: none;">
+                    ← Précédent
+                </button>
+                <button type="button" id="next-btn" 
+                        class="ml-auto px-6 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition">
+                    Suivant →
+                </button>
+                <button type="submit" id="submit-btn" 
+                        class="ml-auto px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-bold hover:from-purple-700 hover:to-blue-700 transition shadow-lg"
+                        style="display: none;">
+                    🚀 Calculer ma consommation
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.mode-btn {
+    border: 2px solid #e5e7eb;
+    background: white;
+    color: #6b7280;
+}
+
+.mode-btn.active {
+    background: linear-gradient(to right, #8b5cf6, #3b82f6);
+    color: white;
+    border-color: transparent;
+}
+
+.mode-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.step {
+    display: none;
+}
+
+.step.active {
+    display: block;
+    animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Toggle année construction */
+.btn-toggle-year {
+    border: 2px solid #e5e7eb;
+    background: white;
+    color: #6b7280;
+}
+
+.btn-toggle-year.active {
+    background: #8b5cf6;
+    color: white;
+    border-color: #8b5cf6;
+}
+
+/* Cartes usage audiovisuel */
+.usage-card {
+    border-color: #e5e7eb;
+}
+
+.usage-card:has(input:checked) {
+    border-color: #8b5cf6;
+    background: #f3e8ff;
+}
+
+/* Cartes contrat électricité */
+.contract-card {
+    border-color: #e5e7eb;
+}
+
+.contract-card:has(input:checked) {
+    border-color: #8b5cf6;
+    background: #f3e8ff;
+}
+</style>
+
+<script>
+let currentStep = 1;
+const totalSteps = 8;
+
+// Mode sélection
+function setMode(mode) {
+    document.getElementById('mode-input').value = mode;
+    
+    if (mode === 'rapide') {
+        document.getElementById('mode-rapide-btn').classList.add('active');
+        document.getElementById('mode-expert-btn').classList.remove('active');
+    } else {
+        document.getElementById('mode-expert-btn').classList.add('active');
+        document.getElementById('mode-rapide-btn').classList.remove('active');
+    }
+}
+
+// Navigation étapes
+document.getElementById('next-btn').addEventListener('click', () => {
+    if (currentStep < totalSteps) {
+        currentStep++;
+        updateStep();
+    }
+});
+
+document.getElementById('prev-btn').addEventListener('click', () => {
+    if (currentStep > 1) {
+        currentStep--;
+        updateStep();
+    }
+});
+
+function updateStep() {
+    // Cacher toutes les étapes
+    document.querySelectorAll('.step').forEach(step => {
+        step.classList.remove('active');
+    });
+    
+    // Afficher l'étape actuelle
+    document.querySelector(`.step[data-step="${currentStep}"]`).classList.add('active');
+    
+    // Mettre à jour la barre de progression
+    const progress = (currentStep / totalSteps) * 100;
+    document.getElementById('current-step').textContent = currentStep;
+    document.getElementById('progress-pct').textContent = Math.round(progress);
+    document.getElementById('progress-bar').style.width = progress + '%';
+    
+    // Gérer les boutons
+    document.getElementById('prev-btn').style.display = currentStep === 1 ? 'none' : 'block';
+    document.getElementById('next-btn').style.display = currentStep === totalSteps ? 'none' : 'block';
+    document.getElementById('submit-btn').style.display = currentStep === totalSteps ? 'block' : 'none';
+    
+    // Scroll en haut
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Toggle année construction
+document.querySelectorAll('.btn-toggle-year').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const mode = this.dataset.mode;
+        
+        // Mettre à jour les boutons
+        document.querySelectorAll('.btn-toggle-year').forEach(b => {
+            b.classList.remove('active');
+        });
+        this.classList.add('active');
+        
+        // Afficher/cacher les champs
+        if (mode === 'plage') {
+            document.getElementById('plage-mode').style.display = 'block';
+            document.getElementById('annee-mode').style.display = 'none';
+            document.getElementById('annee-mode').value = '';
+            document.getElementById('annee-mode').removeAttribute('name');
+            document.getElementById('plage-mode').setAttribute('name', 'annee_construction');
+        } else {
+            document.getElementById('plage-mode').style.display = 'none';
+            document.getElementById('annee-mode').style.display = 'block';
+            document.getElementById('plage-mode').value = '';
+            document.getElementById('plage-mode').removeAttribute('name');
+            document.getElementById('annee-mode').setAttribute('name', 'annee_construction');
+        }
+    });
+});
+
+// Initialiser: plage-mode a le name par défaut
+document.getElementById('plage-mode').setAttribute('name', 'annee_construction');
+</script>
+{% endblock %}

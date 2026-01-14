@@ -23,8 +23,8 @@ class SolarInstallationAdmin(admin.ModelAdmin):
         'user',
         'puissance_crete_kwc',
         'nombre_panneaux',
-        'orientation',
-        'inclinaison',
+        'orientation_azimut',
+        'inclinaison_degres',
         'latitude',
         'longitude',
         'created_at',
@@ -61,7 +61,7 @@ class SolarInstallationAdmin(admin.ModelAdmin):
     
     def has_delete_permission(self, request, obj=None):
         """Empêcher la suppression accidentelle"""
-        return request.user.is_superuse
+        return request.user.is_superuser
 
     def puissance_crete_kwc(self, obj):
         """Affiche la puissance crête calculée."""

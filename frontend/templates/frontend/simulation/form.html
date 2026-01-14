@@ -1,0 +1,683 @@
+{% extends "base.html" %}
+
+{% block title %}Simulation Gratuite - Solar Simulator{% endblock %}
+
+{% block extra_css %}
+<!-- Leaflet CSS pour la carte interactive -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    #map {
+        height: 400px;
+        border-radius: 1rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    
+    .form-section {
+        background: white;
+        border-radius: 1rem;
+        padding: 2rem;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        margin-bottom: 2rem;
+    }
+    
+    .step-indicator {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 3rem;
+        position: relative;
+    }
+    
+    .step-indicator::before {
+        content: '';
+        position: absolute;
+        top: 20px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: #e5e7eb;
+        z-index: 0;
+    }
+    
+    .step {
+        position: relative;
+        z-index: 1;
+        text-align: center;
+        flex: 1;
+    }
+    
+    .step-circle {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: white;
+        border: 2px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 0.5rem;
+        font-weight: bold;
+        transition: all 0.3s;
+    }
+    
+    .step.active .step-circle {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-color: #667eea;
+        transform: scale(1.1);
+    }
+    
+    .step.completed .step-circle {
+        background: #10b981;
+        color: white;
+        border-color: #10b981;
+    }
+    
+    .step-label {
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+    
+    .step.active .step-label {
+        color: #667eea;
+        font-weight: 600;
+    }
+    
+    /* Autocomplete suggestions */
+    #address-suggestions {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-top: none;
+        border-radius: 0 0 0.5rem 0.5rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 1000;
+        display: none;
+    }
+    
+    #address-suggestions.show {
+        display: block;
+    }
+    
+    .suggestion-item {
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        border-bottom: 1px solid #f3f4f6;
+        transition: background 0.2s;
+    }
+    
+    .suggestion-item:hover {
+        background: #f9fafb;
+    }
+    
+    .suggestion-item:last-child {
+        border-bottom: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-12">
+    <div class="container mx-auto px-4">
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                🎁 Simulation Gratuite
+            </h1>
+            <p class="text-xl text-gray-600 max-w-2xl mx-auto">
+                Estimez votre production solaire en 3 étapes simples
+            </p>
+        </div>
+        
+        <!-- Indicateur d'étapes -->
+        <div class="max-w-4xl mx-auto mb-12">
+            <div class="step-indicator">
+                <div class="step active" id="step-1">
+                    <div class="step-circle">1</div>
+                    <div class="step-label">Localisation</div>
+                </div>
+                <div class="step" id="step-2">
+                    <div class="step-circle">2</div>
+                    <div class="step-label">Installation</div>
+                </div>
+                <div class="step" id="step-3">
+                    <div class="step-circle">3</div>
+                    <div class="step-label">Consommation</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Formulaire -->
+        <form id="simulation-form" method="post" action="{% url 'frontend:simulation_create' %}" class="max-w-4xl mx-auto">
+            {% csrf_token %}
+            
+            <!-- Étape 1 : Localisation -->
+            <div class="form-section" id="section-1">
+                <h2 class="text-2xl font-bold mb-6 flex items-center">
+                    <span class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white mr-3">1</span>
+                    📍 Où se situe votre installation ?
+                </h2>
+                
+                <!-- Carte interactive -->
+                <div class="mb-6">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        Cliquez sur la carte ou recherchez votre adresse
+                    </label>
+                    <div id="map"></div>
+                </div>
+                
+                <!-- Champ adresse avec recherche et autocomplétion -->
+                <div class="mb-6 relative">
+                    <label for="adresse-input" class="block text-sm font-semibold text-gray-700 mb-2">
+                        📍 Recherchez votre adresse
+                    </label>
+                    <input type="text" 
+                           name="adresse" 
+                           id="adresse-input"
+                           class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="Tapez votre adresse (ex: 10 rue de Rivoli, Paris)"
+                           autocomplete="off">
+                    <!-- Suggestions d'adresses -->
+                    <div id="address-suggestions"></div>
+                    <p class="text-sm text-gray-500 mt-1">Commencez à taper et sélectionnez une suggestion</p>
+                </div>
+                
+                <!-- Coordonnées cachées -->
+                <input type="hidden" name="latitude" id="latitude-input">
+                <input type="hidden" name="longitude" id="longitude-input">
+                
+                <div class="grid md:grid-cols-2 gap-4 mb-6">
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <div class="text-sm text-gray-600">Latitude</div>
+                        <div class="text-lg font-bold" id="display-lat">-- (cliquez sur la carte)</div>
+                    </div>
+                    <div class="bg-purple-50 p-4 rounded-lg">
+                        <div class="text-sm text-gray-600">Longitude</div>
+                        <div class="text-lg font-bold" id="display-lon">-- (cliquez sur la carte)</div>
+                    </div>
+                </div>
+                
+                <button type="button" onclick="nextStep(2)" class="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition transform hover:scale-105 font-semibold text-lg">
+                    Continuer <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+            
+            <!-- Étape 2 : Configuration Installation -->
+            <div class="form-section hidden" id="section-2">
+                <h2 class="text-2xl font-bold mb-6 flex items-center">
+                    <span class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white mr-3">2</span>
+                    ⚡ Configuration de votre installation
+                </h2>
+                
+                <div class="grid md:grid-cols-2 gap-6 mb-6">
+                    <!-- Puissance -->
+                    <div>
+                        <label for="id_puissance_kw" class="block text-sm font-semibold text-gray-700 mb-2">
+                            ⚡ Puissance installée (kWc)
+                        </label>
+                        <input type="number" 
+                               name="puissance_kw" 
+                               id="id_puissance_kw"
+                               class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="3"
+                               min="1"
+                               max="100"
+                               step="0.1"
+                               required>
+                        <p class="text-sm text-gray-500 mt-1">Puissance totale des panneaux (ex: 3 kWc)</p>
+                    </div>
+                    
+                    <!-- Orientation -->
+                    <div>
+                        <label for="id_orientation" class="block text-sm font-semibold text-gray-700 mb-2">
+                            🧭 Orientation du toit
+                        </label>
+                        <select name="orientation" 
+                                id="id_orientation"
+                                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                required>
+                            <option value="">Sélectionnez...</option>
+                            <option value="N">Nord</option>
+                            <option value="NE">Nord-Est</option>
+                            <option value="E">Est</option>
+                            <option value="SE">Sud-Est</option>
+                            <option value="S" selected>Sud (recommandé)</option>
+                            <option value="SW">Sud-Ouest</option>
+                            <option value="W">Ouest</option>
+                            <option value="NW">Nord-Ouest</option>
+                        </select>
+                        <p class="text-sm text-gray-500 mt-1">Direction vers laquelle le toit est orienté</p>
+                    </div>
+                    
+                    <!-- Inclinaison -->
+                    <div>
+                        <label for="id_inclinaison" class="block text-sm font-semibold text-gray-700 mb-2">
+                            📐 Inclinaison (degrés)
+                        </label>
+                        <input type="number" 
+                               name="inclinaison" 
+                               id="id_inclinaison"
+                               class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="30"
+                               min="0"
+                               max="90"
+                               value="30"
+                               required>
+                        <p class="text-sm text-gray-500 mt-1">Angle d'inclinaison du toit (0° = plat, 90° = vertical)</p>
+                    </div>
+                    
+                    <!-- Type de toiture -->
+                    <div>
+                        <label for="id_type_toiture" class="block text-sm font-semibold text-gray-700 mb-2">
+                            🏠 Type de toiture
+                        </label>
+                        <select name="type_toiture" 
+                                id="id_type_toiture"
+                                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                required>
+                            <option value="">Sélectionnez...</option>
+                            <option value="tuiles" selected>Tuiles</option>
+                            <option value="ardoise">Ardoise</option>
+                            <option value="zinc">Zinc</option>
+                            <option value="beton">Béton</option>
+                            <option value="tole">Tôle</option>
+                        </select>
+                        <p class="text-sm text-gray-500 mt-1">Matériau du toit</p>
+                    </div>
+                </div>
+                
+                <div class="flex gap-4">
+                    <button type="button" onclick="prevStep(1)" class="flex-1 px-6 py-4 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-semibold">
+                        <i class="fas fa-arrow-left mr-2"></i> Retour
+                    </button>
+                    <button type="button" onclick="nextStep(3)" class="flex-1 px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition transform hover:scale-105 font-semibold">
+                        Continuer <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Étape 3 : Consommation -->
+            <div class="form-section hidden" id="section-3">
+                <h2 class="text-2xl font-bold mb-6 flex items-center">
+                    <span class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white mr-3">3</span>
+                    🏠 Votre consommation électrique
+                </h2>
+                
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
+                    <p class="text-sm text-blue-800">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        Ces informations nous permettent de calculer votre taux d'autoconsommation et vos économies réelles.
+                    </p>
+                </div>
+                
+                <div class="grid md:grid-cols-2 gap-6 mb-6">
+                    <!-- Consommation annuelle -->
+                    <div>
+                        <label for="id_consommation_annuelle" class="block text-sm font-semibold text-gray-700 mb-2">
+                            💡 Consommation annuelle (kWh)
+                        </label>
+                        <input type="number" 
+                               name="consommation_annuelle" 
+                               id="id_consommation_annuelle"
+                               class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="5000"
+                               min="1000"
+                               max="50000"
+                               value="5000">
+                        <p class="text-sm text-gray-500 mt-1">Visible sur votre facture d'électricité</p>
+                    </div>
+                    
+                    <!-- Nombre de personnes -->
+                    <div>
+                        <label for="id_nb_personnes" class="block text-sm font-semibold text-gray-700 mb-2">
+                            👨‍👩‍👧‍👦 Nombre de personnes
+                        </label>
+                        <input type="number" 
+                               name="nb_personnes" 
+                               id="id_nb_personnes"
+                               class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="2"
+                               min="1"
+                               max="10"
+                               value="2">
+                        <p class="text-sm text-gray-500 mt-1">Dans le foyer</p>
+                    </div>
+                    
+                    <!-- Surface habitable -->
+                    <div class="md:col-span-2">
+                        <label for="id_surface_habitable" class="block text-sm font-semibold text-gray-700 mb-2">
+                            📏 Surface habitable (m²)
+                        </label>
+                        <input type="number" 
+                               name="surface_habitable" 
+                               id="id_surface_habitable"
+                               class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="100"
+                               min="20"
+                               max="500"
+                               value="100">
+                        <p class="text-sm text-gray-500 mt-1">Surface totale du logement</p>
+                    </div>
+                </div>
+                
+                <!-- Aide au calcul -->
+<div class="bg-purple-50 p-6 rounded-lg mb-6">
+    <h3 class="font-semibold mb-3 flex items-center">
+        <i class="fas fa-calculator text-purple-600 mr-2"></i>
+        Vous ne connaissez pas votre consommation ?
+    </h3>
+    
+    <!-- Option 1 : Estimation rapide -->
+    <div class="mb-4">
+        <p class="text-sm text-gray-700 mb-3">
+            <strong>Option 1 :</strong> Estimation rapide selon la surface
+        </p>
+        <div class="grid grid-cols-3 gap-3 text-sm">
+            <div class="bg-white p-3 rounded text-center cursor-pointer hover:bg-purple-50 transition"
+                 onclick="document.getElementById('id_consommation_annuelle').value = 3000">
+                <div class="font-bold text-purple-600">50 m²</div>
+                <div class="text-gray-600">~3000 kWh/an</div>
+            </div>
+            <div class="bg-white p-3 rounded text-center cursor-pointer hover:bg-purple-50 transition"
+                 onclick="document.getElementById('id_consommation_annuelle').value = 5000">
+                <div class="font-bold text-purple-600">100 m²</div>
+                <div class="text-gray-600">~5000 kWh/an</div>
+            </div>
+            <div class="bg-white p-3 rounded text-center cursor-pointer hover:bg-purple-50 transition"
+                 onclick="document.getElementById('id_consommation_annuelle').value = 8000">
+                <div class="font-bold text-purple-600">150 m²</div>
+                <div class="text-gray-600">~8000 kWh/an</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Option 2 : Calculateur précis -->
+    <div class="border-t border-purple-200 pt-4">
+        <p class="text-sm text-gray-700 mb-3">
+            <strong>Option 2 :</strong> Calcul précis basé sur votre logement (DPE, chauffage, appareils...)
+        </p>
+        <a href="{% url 'frontend:consumption_calculator' %}" 
+           target="_blank"
+           class="inline-flex items-center px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition shadow-md">
+            <i class="fas fa-calculator mr-2"></i>
+            Calculateur de consommation détaillé
+            <i class="fas fa-external-link-alt ml-2 text-xs"></i>
+        </a>
+        <p class="text-xs text-gray-600 mt-2">
+            <i class="fas fa-clock mr-1"></i> 5 minutes • S'ouvre dans un nouvel onglet
+        </p>
+    </div>
+</div>
+                
+                <div class="flex gap-4">
+                    <button type="button" onclick="prevStep(2)" class="flex-1 px-6 py-4 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-semibold">
+                        <i class="fas fa-arrow-left mr-2"></i> Retour
+                    </button>
+                    <button type="submit" id="submit-button" class="flex-1 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:shadow-lg transition transform hover:scale-105 font-semibold text-lg">
+                        <i class="fas fa-rocket mr-2"></i> Lancer la Simulation
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Leaflet JS pour la carte -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    console.log('🚀 Script de simulation chargé');
+    
+    // ============== GESTION DES ÉTAPES ==============
+    let currentStep = 1;
+    
+    function nextStep(step) {
+        console.log(`▶️ Passage à l'étape ${step}`);
+        
+        // Validation avant de passer à l'étape suivante
+        if (step === 2) {
+            const lat = document.getElementById('latitude-input').value;
+            const lon = document.getElementById('longitude-input').value;
+            
+            if (!lat || !lon) {
+                alert('⚠️ Veuillez sélectionner une localisation sur la carte ou via la recherche d\'adresse');
+                return;
+            }
+        }
+        
+        if (step === 3) {
+            const puissance = document.getElementById('id_puissance_kw').value;
+            
+            if (!puissance || puissance < 1) {
+                alert('⚠️ Veuillez indiquer la puissance de votre installation');
+                return;
+            }
+        }
+        
+        // Cacher l'étape actuelle
+        document.getElementById(`section-${currentStep}`).classList.add('hidden');
+        document.getElementById(`step-${currentStep}`).classList.remove('active');
+        document.getElementById(`step-${currentStep}`).classList.add('completed');
+        
+        // Afficher la nouvelle étape
+        currentStep = step;
+        document.getElementById(`section-${currentStep}`).classList.remove('hidden');
+        document.getElementById(`step-${currentStep}`).classList.add('active');
+        
+        // Scroll vers le haut
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    
+    function prevStep(step) {
+        console.log(`◀️ Retour à l'étape ${step}`);
+        
+        // Cacher l'étape actuelle
+        document.getElementById(`section-${currentStep}`).classList.add('hidden');
+        document.getElementById(`step-${currentStep}`).classList.remove('active');
+        
+        // Afficher l'étape précédente
+        currentStep = step;
+        document.getElementById(`section-${currentStep}`).classList.remove('hidden');
+        document.getElementById(`step-${currentStep}`).classList.add('active');
+        document.getElementById(`step-${currentStep}`).classList.remove('completed');
+        
+        // Scroll vers le haut
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    
+    // ============== CARTE INTERACTIVE ==============
+    let map, marker;
+    
+    console.log('🗺️ Initialisation de la carte...');
+    map = L.map('map').setView([46.603354, 1.888334], 6);
+    
+    // Ajouter les tuiles OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+    }).addTo(map);
+    
+    // Marqueur personnalisé
+    const customIcon = L.icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    });
+    
+    // Clic sur la carte
+    map.on('click', function(e) {
+        console.log('📍 Clic sur la carte:', e.latlng);
+        const lat = e.latlng.lat.toFixed(6);
+        const lon = e.latlng.lng.toFixed(6);
+        
+        updateLocation(lat, lon);
+        
+        // Ajouter/déplacer le marqueur
+        if (marker) {
+            marker.setLatLng(e.latlng);
+        } else {
+            marker = L.marker(e.latlng, { icon: customIcon }).addTo(map);
+        }
+    });
+    
+    function updateLocation(lat, lon, address = '') {
+        console.log('📍 Mise à jour localisation:', lat, lon, address);
+        document.getElementById('latitude-input').value = lat;
+        document.getElementById('longitude-input').value = lon;
+        document.getElementById('display-lat').textContent = lat + '°';
+        document.getElementById('display-lon').textContent = lon + '°';
+        
+        if (address) {
+            document.getElementById('adresse-input').value = address;
+        }
+    }
+    
+    // ============== AUTOCOMPLÉTION ADRESSE ==============
+    const addressInput = document.getElementById('adresse-input');
+    const suggestionsDiv = document.getElementById('address-suggestions');
+    let searchTimeout;
+    
+    addressInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        
+        clearTimeout(searchTimeout);
+        
+        if (query.length < 3) {
+            suggestionsDiv.classList.remove('show');
+            suggestionsDiv.innerHTML = '';
+            return;
+        }
+        
+        // Attendre 500ms après la dernière frappe
+        searchTimeout = setTimeout(() => {
+            console.log('🔍 Recherche adresse:', query);
+            searchAddress(query);
+        }, 500);
+    });
+    
+    async function searchAddress(query) {
+        try {
+            // API Nominatim (OpenStreetMap) - Gratuite
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=fr&limit=5`
+            );
+            
+            const results = await response.json();
+            console.log('✅ Résultats:', results.length);
+            
+            displaySuggestions(results);
+        } catch (error) {
+            console.error('❌ Erreur recherche adresse:', error);
+        }
+    }
+    
+    function displaySuggestions(results) {
+        if (results.length === 0) {
+            suggestionsDiv.innerHTML = '<div class="suggestion-item">Aucun résultat trouvé</div>';
+            suggestionsDiv.classList.add('show');
+            return;
+        }
+        
+        suggestionsDiv.innerHTML = results.map(result => `
+            <div class="suggestion-item" 
+                 onclick="selectAddress('${result.lat}', '${result.lon}', '${result.display_name.replace(/'/g, "\\'")}')">
+                <div class="font-semibold text-gray-800">${result.display_name.split(',')[0]}</div>
+                <div class="text-sm text-gray-500">${result.display_name}</div>
+            </div>
+        `).join('');
+        
+        suggestionsDiv.classList.add('show');
+    }
+    
+    function selectAddress(lat, lon, address) {
+        console.log('✅ Adresse sélectionnée:', address);
+        
+        updateLocation(lat, lon, address);
+        
+        // Centrer la carte
+        map.setView([lat, lon], 15);
+        
+        // Ajouter le marqueur
+        if (marker) {
+            marker.setLatLng([lat, lon]);
+        } else {
+            marker = L.marker([lat, lon], { icon: customIcon }).addTo(map);
+        }
+        
+        // Cacher les suggestions
+        suggestionsDiv.classList.remove('show');
+        suggestionsDiv.innerHTML = '';
+    }
+    
+    // Cacher les suggestions si on clique ailleurs
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#adresse-input') && !e.target.closest('#address-suggestions')) {
+            suggestionsDiv.classList.remove('show');
+        }
+    });
+    
+    // ============== GÉOLOCALISATION AUTOMATIQUE ==============
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            const lat = position.coords.latitude.toFixed(6);
+            const lon = position.coords.longitude.toFixed(6);
+            
+            console.log('📍 Géolocalisation automatique:', lat, lon);
+            map.setView([lat, lon], 13);
+            marker = L.marker([lat, lon], { icon: customIcon }).addTo(map);
+            updateLocation(lat, lon);
+        }, function(error) {
+            console.log('⚠️ Géolocalisation refusée ou indisponible');
+        });
+    }
+    
+    // ============== SOUMISSION DU FORMULAIRE ==============
+    const form = document.getElementById('simulation-form');
+    const submitButton = document.getElementById('submit-button');
+    
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        console.log('🚀 Soumission du formulaire...');
+        
+        // Validation finale
+        const lat = document.getElementById('latitude-input').value;
+        const lon = document.getElementById('longitude-input').value;
+        const puissance = document.getElementById('id_puissance_kw').value;
+        
+        if (!lat || !lon) {
+            alert('⚠️ Veuillez sélectionner une localisation');
+            return;
+        }
+        
+        if (!puissance || puissance < 1) {
+            alert('⚠️ Veuillez indiquer la puissance de l\'installation');
+            return;
+        }
+        
+        // Désactiver le bouton pour éviter les doubles soumissions
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Envoi en cours...';
+        
+        // Afficher toutes les données du formulaire dans la console
+        const formData = new FormData(form);
+        console.log('📊 Données du formulaire:');
+        for (let [key, value] of formData.entries()) {
+            console.log(`  ${key}: ${value}`);
+        }
+        
+        // Soumettre le formulaire
+        form.submit();
+    });
+    
+    console.log('✅ Script initialisé avec succès');
+</script>
+{% endblock %}
