@@ -1,11 +1,14 @@
 # solar_calc/services/calculator.py
 """
 Calculatrice pour les simulations solaires.
+Version corrigée pour accepter DataFrame pandas depuis PVGIS.
 """
 
 import logging
 from datetime import datetime
 import json
+import pandas as pd
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -39,11 +42,9 @@ class SimulationCalculator:
         Calcule la production solaire basée sur les données météorologiques.
         
         Args:
-            weather_data: Dict avec les données PVGIS
-                {
-                    'monthly': [float, ...],  # 12 valeurs (kWh/m²/jour)
-                    'hourly': [float, ...]    # 24 valeurs (W/m²)
-                }
+            weather_data: Peut être :
+                - DataFrame pandas avec colonnes 'ghi', 'temperature' (depuis PVGIS)
+                - Dict avec 'monthly' et 'hourly' (ancien format)
         
         Returns:
             Dict avec:
@@ -56,10 +57,128 @@ class SimulationCalculator:
         
         logger.info("📊 Calcul de la production solaire...")
         
-        # Données par défaut si pas de données PVGIS
-        if not weather_data:
-            weather_data = self._get_default_irradiance()
+        # Vérifier le type de weather_data
+        if isinstance(weather_data, pd.DataFrame):
+            # Nouveau format : DataFrame pandas depuis PVGIS
+            logger.info(f"✅ Données PVGIS reçues : {len(weather_data)} heures")
+            return self._calculate_from_dataframe(weather_data)
         
+        elif isinstance(weather_data, dict):
+            # Ancien format : dict avec monthly/hourly
+            logger.info("⚠️ Format dict détecté (ancien format)")
+            return self._calculate_from_dict(weather_data)
+        
+        else:
+            # Données invalides ou manquantes
+            logger.warning(f"⚠️ Type de données invalide : {type(weather_data)}")
+            logger.info("📊 Utilisation des données par défaut")
+            default_data = self._get_default_irradiance()
+            return self._calculate_from_dict(default_data)
+    
+    
+    def _calculate_from_dataframe(self, df: pd.DataFrame):
+        """
+        Calcule la production depuis un DataFrame PVGIS.
+        
+        Args:
+            df: DataFrame avec colonnes 'ghi' (W/m²), 'temperature' (°C), 'timestamp'
+        
+        Returns:
+            Dict avec les résultats de production
+        """
+        # Vérifier les colonnes nécessaires
+        if 'ghi' not in df.columns:
+            logger.error(f"❌ Colonne 'ghi' manquante. Colonnes disponibles : {df.columns.tolist()}")
+            raise ValueError("DataFrame doit contenir la colonne 'ghi'")
+        
+        # Ajustement selon l'orientation et l'inclinaison
+        orientation_factor = self._get_orientation_factor()
+        inclinaison_factor = self._get_inclinaison_factor()
+        
+        # Calculer la production horaire (kW)
+        # GHI en W/m² → convertir en kW avec surface panneau
+        # Puissance crête = 1000 W/m² à 25°C
+        # Production = (GHI / 1000) × Puissance_kWc × Rendements × Facteurs
+        
+        df_calc = df.copy()
+        df_calc['production_kw'] = (
+            (df_calc['ghi'] / 1000) *  # Normaliser à STC (1000 W/m²)
+            self.puissance_kw *
+            self.rendement_global *
+            orientation_factor *
+            inclinaison_factor
+        )
+        
+        # Ajustement température (performance baisse de 0.4% par °C au-dessus de 25°C)
+        if 'temperature' in df_calc.columns:
+            temp_factor = 1 - 0.004 * (df_calc['temperature'] - 25)
+            temp_factor = temp_factor.clip(lower=0.7, upper=1.1)  # Limiter entre 70% et 110%
+            df_calc['production_kw'] *= temp_factor
+        
+        # Production annuelle totale (kWh)
+        production_annuelle = df_calc['production_kw'].sum()
+        
+        # Agréger par mois (si timestamp existe)
+        if 'timestamp' in df_calc.columns:
+            df_calc['timestamp'] = pd.to_datetime(df_calc['timestamp'])
+            df_calc['month'] = df_calc['timestamp'].dt.month
+            production_monthly_series = df_calc.groupby('month')['production_kw'].sum()
+            
+            # S'assurer d'avoir 12 mois
+            production_monthly = []
+            for month in range(1, 13):
+                if month in production_monthly_series.index:
+                    production_monthly.append(round(production_monthly_series[month], 2))
+                else:
+                    production_monthly.append(0.0)
+        else:
+            # Pas de timestamp, distribuer uniformément
+            logger.warning("⚠️ Pas de timestamp, distribution uniforme mensuelle")
+            monthly_value = production_annuelle / 12
+            production_monthly = [round(monthly_value, 2)] * 12
+        
+        # Profil horaire moyen (24h) - moyenne de chaque heure sur toute l'année
+        if 'timestamp' in df_calc.columns:
+            df_calc['hour'] = df_calc['timestamp'].dt.hour
+            production_hourly_series = df_calc.groupby('hour')['production_kw'].mean()
+            
+            production_hourly = []
+            for hour in range(24):
+                if hour in production_hourly_series.index:
+                    production_hourly.append(round(production_hourly_series[hour], 3))
+                else:
+                    production_hourly.append(0.0)
+        else:
+            # Profil par défaut (courbe en cloche)
+            production_hourly = self._get_default_hourly_pattern(production_annuelle / 8760)
+        
+        # Autoconsommation (par défaut 70%)
+        autoconso_ratio = 70.0
+        autoconso_kwh = production_annuelle * (autoconso_ratio / 100)
+        injection_kwh = production_annuelle - autoconso_kwh
+        
+        logger.info(f"📈 Production annuelle : {production_annuelle:.2f} kWh")
+        logger.info(f"⚡ Autoconsommation : {autoconso_ratio}%")
+        
+        return {
+            'annuelle': round(production_annuelle, 2),
+            'monthly': production_monthly,
+            'daily': production_hourly,
+            'autoconso_ratio': autoconso_ratio,
+            'injection': round(injection_kwh, 2),
+        }
+    
+    
+    def _calculate_from_dict(self, weather_data: dict):
+        """
+        Calcule la production depuis un dict (ancien format).
+        
+        Args:
+            weather_data: Dict avec 'monthly' et 'hourly'
+        
+        Returns:
+            Dict avec les résultats de production
+        """
         monthly_irradiance = weather_data.get('monthly', [1.0] * 12)
         hourly_irradiance = weather_data.get('hourly', [0.5] * 24)
         
@@ -88,8 +207,8 @@ class SimulationCalculator:
         autoconso_kwh = production_annuelle * (autoconso_ratio / 100)
         injection_kwh = production_annuelle - autoconso_kwh
         
-        logger.info(f"📈 Production annuelle: {production_annuelle:.2f} kWh")
-        logger.info(f"⚡ Autoconsommation: {autoconso_ratio}%")
+        logger.info(f"📈 Production annuelle : {production_annuelle:.2f} kWh")
+        logger.info(f"⚡ Autoconsommation : {autoconso_ratio}%")
         
         return {
             'annuelle': round(production_annuelle, 2),
@@ -152,7 +271,7 @@ class SimulationCalculator:
             kwh = (consumption_annuelle / 8760) * factor  # 8760 = 24 × 365
             consumption_hourly.append(round(kwh, 3))
         
-        logger.info(f"📉 Consommation annuelle: {consumption_annuelle:.2f} kWh")
+        logger.info(f"📉 Consommation annuelle : {consumption_annuelle:.2f} kWh")
         
         return {
             'annuelle': consumption_annuelle,
@@ -197,9 +316,9 @@ class SimulationCalculator:
         # Taux de rentabilité annuel
         taux_rentabilite = (economie_annuelle / cout_installation) * 100 if cout_installation > 0 else 0
         
-        logger.info(f"💵 Économie annuelle: {economie_annuelle:.2f}€")
-        logger.info(f"💶 ROI 25 ans: {roi_25ans:.2f}€")
-        logger.info(f"📊 Taux rentabilité: {taux_rentabilite:.2f}%")
+        logger.info(f"💵 Économie annuelle : {economie_annuelle:.2f}€")
+        logger.info(f"💶 ROI 25 ans : {roi_25ans:.2f}€")
+        logger.info(f"📊 Taux rentabilité : {taux_rentabilite:.2f}%")
         
         return {
             'economie_annuelle': round(economie_annuelle, 2),
@@ -231,6 +350,54 @@ class SimulationCalculator:
         }
         
         return factors.get(self.orientation, 0.85)
+    
+    
+    def _get_inclinaison_factor(self):
+        """
+        Retourne le facteur d'inclinaison (0-1).
+        
+        - 30-35° = 1.0 (optimal en France)
+        - 0° (plat) = 0.85
+        - 45° = 0.95
+        - 90° (vertical) = 0.70
+        """
+        inclinaison = self.inclinaison
+        
+        if inclinaison is None:
+            return 1.0
+        
+        # Courbe optimale autour de 30-35°
+        if 25 <= inclinaison <= 40:
+            return 1.0
+        elif inclinaison < 25:
+            # Facteur diminue quand on s'approche de 0° (plat)
+            return 0.85 + (inclinaison / 25) * 0.15
+        else:
+            # Facteur diminue pour angles > 40°
+            return max(0.70, 1.0 - (inclinaison - 40) / 100)
+    
+    
+    def _get_default_hourly_pattern(self, avg_power_kw):
+        """
+        Génère un profil horaire par défaut (courbe en cloche).
+        
+        Args:
+            avg_power_kw: Puissance moyenne (kW)
+        
+        Returns:
+            Liste de 24 valeurs (kW)
+        """
+        hourly_pattern = []
+        for hour in range(24):
+            if 6 <= hour <= 19:
+                # Courbe sinusoïdale entre 6h et 19h
+                angle = (hour - 6) / 13 * np.pi
+                factor = np.sin(angle)
+                hourly_pattern.append(round(avg_power_kw * factor * 2, 3))
+            else:
+                hourly_pattern.append(0.0)
+        
+        return hourly_pattern
     
     
     def _get_default_irradiance(self):

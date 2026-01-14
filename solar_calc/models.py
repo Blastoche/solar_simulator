@@ -16,7 +16,7 @@ class SolarInstallationModel(models.Model):
     """
     Configuration d'une installation solaire (stockage en base de données).
     """
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='installations')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='solar_installations')
     nom = models.CharField(max_length=200, verbose_name="Nom de l'installation")
     
     # Géolocalisation

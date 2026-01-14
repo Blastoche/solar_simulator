@@ -5,7 +5,7 @@ import logging
 
 from frontend.models import Simulation, Resultat
 from .services.calculator import SimulationCalculator
-from weather.services.pvgis import PVGISService
+from weather.services.pvgis import get_pvgis_weather_data
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,6 @@ def run_simulation_task(self, simulation_id):
         
         installation = simulation.installation
         calculator = SimulationCalculator(installation)
-        pvgis = PVGISService()
         
         # ===== ÉTAPE 1: Données météo (20%) =====
         self.update_state(
@@ -29,11 +28,15 @@ def run_simulation_task(self, simulation_id):
             meta={'percentage': 20, 'message': '📡 Récupération des données météorologiques...'}
         )
         
-        weather_data = pvgis.get_typical_year_data(
-            lat=installation.latitude,
-            lon=installation.longitude
+        # CORRECTION : Utiliser la bonne fonction
+        from weather.services.pvgis import get_pvgis_weather_data
+        
+        weather_df, metadata = get_pvgis_weather_data(
+            latitude=installation.latitude,
+            longitude=installation.longitude,
+            use_cache=True
         )
-        logger.info(f"Sim {simulation_id}: Données météo récupérées")
+        logger.info(f"Sim {simulation_id}: Données météo récupérées - {len(weather_df)} heures")
         
         # ===== ÉTAPE 2: Production (50%) =====
         self.update_state(
@@ -41,7 +44,8 @@ def run_simulation_task(self, simulation_id):
             meta={'percentage': 50, 'message': '☀️ Calcul de production solaire...'}
         )
         
-        production = calculator.calculate_production(weather_data)
+        # Votre SimulationCalculator doit maintenant accepter un DataFrame
+        production = calculator.calculate_production(weather_df)
         logger.info(f"Sim {simulation_id}: Production calculée = {production['annuelle']} kWh")
         
         # ===== ÉTAPE 3: Consommation (70%) =====
