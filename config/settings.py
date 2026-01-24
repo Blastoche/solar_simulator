@@ -56,7 +56,7 @@ INSTALLED_APPS = [
     'solar_calc',
     'financial',
     'reporting',
-    # 'battery',  # Décommenter plus tard
+    'battery',  
     'frontend',
 
 ]
