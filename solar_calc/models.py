@@ -55,13 +55,6 @@ class SolarInstallationModel(models.Model):
         default=1.0,
         verbose_name="Facteur d'ombrage (0-1)"
     )
-    class Meta:
-        verbose_name = "Installation solaire"
-        verbose_name_plural = "Installations solaires"
-
-    @property
-    def puissance_crete_kwc(self):
-        return self.nombre_panneaux * self.puissance_panneau_wc / 1000
     
     # Onduleur
     type_onduleur = models.CharField(
@@ -124,10 +117,7 @@ class ConsumptionProfileModel(models.Model):
         default='C',
         verbose_name="DPE"
     )
-    class Meta:
-        verbose_name = "Profil de consommation"
-        verbose_name_plural = "Profils de consommation"
-
+    
     # Systèmes énergétiques
     type_chauffage = models.CharField(
         max_length=50,
@@ -148,6 +138,20 @@ class ConsumptionProfileModel(models.Model):
         ],
         default='non_electrique',
         verbose_name="Type ECS"
+    )
+    
+    # Profil d'occupation
+    profile_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('actif_absent', 'Actif absent en journée (travail externe)'),
+            ('teletravail', 'Télétravail / Présence en journée'),
+            ('retraite', 'Retraité (présent toute la journée)'),
+            ('famille', 'Famille avec enfants'),
+        ],
+        default='actif_absent',
+        verbose_name="Type de profil d'occupation",
+        help_text="Définit le pattern de consommation selon le mode de vie"
     )
     
     # Appareils (stockage JSON simple)
@@ -259,7 +263,7 @@ class SimulationModel(models.Model):
     @property
     def economie_annuelle_estimee(self):
         """
-        Économie annuelle estimée (simplifié).
+        Économie annuelle estimée (simplifiée).
         Tarif moyen : 0.2276 €/kWh
         """
         tarif_moyen = 0.2276

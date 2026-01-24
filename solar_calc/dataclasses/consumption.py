@@ -12,6 +12,7 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict
 from datetime import datetime
+from solar_calc.services.consumption_profiles import ConsumptionProfiles
 
 
 @dataclass
@@ -217,7 +218,10 @@ class ConsumptionProfile:
     
     # Données météorologiques
     temperature_moyenne_annuelle: float = 12.0
-    
+
+    # Type de profil de consommation
+    profile_type: str = 'actif_absent'  
+
     # Autres équipements (à enrichir)
     autres_appareils: List[Appareil] = field(default_factory=list)
     
@@ -324,42 +328,44 @@ class ConsumptionProfile:
     
     def generer_profil_horaire(self) -> pd.DataFrame:
         """
-        Génère un profil de consommation horaire simplifié sur une année (8760h).
+        Génère un profil de consommation horaire sur une année (8760h).
+        
+        Version améliorée avec :
+        - Profils par type d'usage (actif/télétravail/retraite/famille)
+        - Distinction weekends vs semaine
+        - Variation aléatoire réaliste
         
         Returns:
             pd.DataFrame: DataFrame avec colonnes [timestamp, consommation_kw]
+            - timestamp: Horodatage heure par heure
+            - consommation_kw: Consommation en kW
+            8760 lignes (365 jours × 24 heures)
         """
-        # Créer un index horaire pour une année
+        # Créer index horaire
         dates = pd.date_range(
             start=f'{datetime.now().year}-01-01',
             periods=8760,
-            freq='H'
+            freq='h'
         )
         
         # Consommation annuelle totale
         conso_totale = self.calcul_consommation_base()
         
-        # Répartition de base (simplifié - à améliorer avec profils réels)
-        # Pattern journalier simple : creux la nuit, pics matin/soir
-        pattern_journalier = np.array([
-            0.3, 0.3, 0.3, 0.3, 0.3, 0.4,  # 0h-5h
-            0.7, 1.2, 1.0, 0.6, 0.5, 0.6,  # 6h-11h
-            0.8, 0.7, 0.5, 0.5, 0.6, 0.9,  # 12h-17h
-            1.5, 1.3, 1.1, 0.9, 0.6, 0.4   # 18h-23h
-        ])
-        
-        # Répéter le pattern pour toute l'année
-        pattern_annuel = np.tile(pattern_journalier, 365)
+        # ✅ NOUVEAU : Générer pattern avec profil utilisateur
+        pattern_annuel = ConsumptionProfiles.generate_yearly_pattern(
+            profile_type=self.profile_type,
+            add_randomness=True  # Variation ±10%
+        )
         
         # Normaliser pour correspondre à la consommation totale
         pattern_normalise = pattern_annuel / pattern_annuel.sum() * conso_totale
         
-        # Créer le DataFrame
+        # Créer DataFrame
         df = pd.DataFrame({
             'timestamp': dates,
             'consommation_kw': pattern_normalise
         })
-        
+    
         return df
 
 

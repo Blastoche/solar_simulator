@@ -45,7 +45,9 @@ class ConsumptionCalculator:
     # Il faut diviser par ces coefficients pour obtenir l'énergie FINALE réellement consommée
     COEFFICIENTS_PRIMAIRE_FINALE = {
         'electrique': 2.58,  # Ancien coef (avant RE2020: 2.3)
-        'pac': 2.58,         # PAC = électricité
+        'pompe_chaleur': 2.58,
+        'pompe_a_chaleur': 2.58,
+        'PAC': 2.58, # PAC = électricité    
         'gaz': 1.0,          # Gaz naturel
         'fioul': 1.0,        # Fioul
         'bois': 0.6,         # Bois/biomasse
@@ -165,6 +167,10 @@ class ConsumptionCalculator:
         """
         type_chauffage = self.data.get('type_chauffage', 'electrique')
         
+        # ✅ Normaliser les variantes de pompe à chaleur
+        if type_chauffage in ['pompe_chaleur', 'pompe_a_chaleur', 'PAC']:
+            type_chauffage = 'pac'
+
         # Si non électrique, consommation électrique = 0
         if type_chauffage not in ['electrique', 'pac']:
             logger.info(f"Chauffage {type_chauffage} (non électrique)")
