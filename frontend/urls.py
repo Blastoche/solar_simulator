@@ -9,6 +9,7 @@ from . import views
 app_name = 'frontend'
 
 urlpatterns = [
+
     # Pages statiques
     path('', views.HomeView.as_view(), name='home'),
     path('mentions/', views.MentionsView.as_view(), name='mentions'),
@@ -17,6 +18,11 @@ urlpatterns = [
     
     # Simulation
     path('simulation/', views.SimulationFormView.as_view(), name='simulation_create'),
+    
+    path('simulation/calculer-puissance/', 
+         views.calculate_optimal_power, 
+         name='calculate_optimal_power'),
+
     path('simulation/<uuid:simulation_id>/progression/', 
          views.SimulationProgressView.as_view(), 
          name='simulation_progress'),
@@ -52,7 +58,7 @@ urlpatterns = [
      path('consommation/<int:consommation_id>/resultat/', 
      views.ConsumptionResultView.as_view(), 
      name='consumption_result'),
-path('consommation/<int:consommation_id>/details/', 
+     path('consommation/<int:consommation_id>/details/', 
      views.ConsumptionDetailsView.as_view(), 
      name='consumption_details'),
 
@@ -61,4 +67,14 @@ path('consommation/<int:consommation_id>/details/',
     path('consommation/expert/calculer/', views.consumption_calculate_expert, name='consumption_calculate_expert'),
     path('consommation/expert/<int:consommation_id>/resultat/', views.ConsumptionExpertResultView.as_view(), name='consumption_result_expert'),
     path('consommation/expert/<int:consommation_id>/details/', views.ConsumptionExpertDetailsView.as_view(), name='consumption_expert_details'),
+
+     # Transition Consommation → Simulation PV
+    path('consommation/<int:consommation_id>/vers-simulation/', 
+         views.simulation_from_consumption, 
+         name='simulation_from_consumption'),
+
+    # Export PDF
+    path('consommation/<int:consommation_id>/export-pdf/', 
+         views.export_pdf_expert, 
+         name='export_pdf_expert'),
 ]

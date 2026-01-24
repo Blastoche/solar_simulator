@@ -20,18 +20,20 @@
         <!-- Sélecteur de mode -->
         <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
             <div class="flex gap-4 justify-center">
+                <!-- ✅ MODE RAPIDE (actif par défaut) -->
                 <button id="mode-rapide-btn" 
                         class="mode-btn active px-6 py-3 rounded-lg font-semibold transition"
-                        onclick="setMode('rapide')">
+                        onclick="selectMode('rapide')">
                     🚀 Mode Rapide (5 min)
                 </button>
-                <button id="mode-expert-btn" 
-                        class="mode-btn px-6 py-3 rounded-lg font-semibold transition"
-                        onclick="setMode('expert')"
-                        disabled
-                        title="Bientôt disponible">
-                    🔬 Mode Expert (15 min) - Bientôt
-                </button>
+                
+                <!-- ✅ MODE EXPERT (maintenant activé !) -->
+                <a href="{% url 'frontend:consumption_calculator_expert' %}"
+                   id="mode-expert-btn" 
+                   class="mode-btn px-6 py-3 rounded-lg font-semibold transition inline-flex items-center"
+                   style="text-decoration: none;">
+                    🔬 Mode Expert (15 min)
+                </a>
             </div>
         </div>
         
@@ -180,21 +182,21 @@
             <div class="step" data-step="3">
                 <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
                     <span class="bg-purple-100 text-purple-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">3</span>
-                    🚿 Eau chaude sanitaire
+                    💧 Eau Chaude Sanitaire
                 </h2>
                 
                 <div class="space-y-6">
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            Type de production d'eau chaude <span class="text-red-500">*</span>
+                            Type de production <span class="text-red-500">*</span>
                         </label>
                         <select name="type_ecs" required
                                 class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                            <option value="ballon_electrique">Ballon électrique</option>
-                            <option value="chauffe_eau_thermodynamique">Chauffe-eau thermodynamique</option>
-                            <option value="gaz">Gaz (chaudière ou chauffe-eau)</option>
-                            <option value="solaire">Solaire thermique + appoint</option>
-                            <option value="autre">Autre</option>
+                            <option value="ballon_electrique">Ballon électrique (cumulus)</option>
+                            <option value="chauffe_eau_instantane">Chauffe-eau instantané</option>
+                            <option value="thermodynamique">Chauffe-eau thermodynamique</option>
+                            <option value="solaire">Chauffe-eau solaire</option>
+                            <option value="gaz">Chauffe-eau gaz</option>
                         </select>
                     </div>
                     
@@ -202,9 +204,9 @@
                         <label class="block text-sm font-semibold text-gray-700 mb-2">
                             Capacité du ballon (litres)
                         </label>
-                        <input type="number" name="capacite_ecs" min="50" max="500" value="200" step="50"
+                        <input type="number" name="capacite_ecs" min="50" max="500" value="200"
                                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                        <p class="text-xs text-gray-500 mt-1">💡 Recommandé : 50L par personne</p>
+                        <p class="text-xs text-gray-500 mt-1">💡 Recommandation : 50L/personne</p>
                     </div>
                 </div>
             </div>
@@ -213,202 +215,146 @@
             <div class="step" data-step="4">
                 <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
                     <span class="bg-purple-100 text-purple-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">4</span>
-                    🧺 Électroménager
+                    🔌 Électroménager
                 </h2>
                 
                 <div class="space-y-6">
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            Âge moyen de vos appareils
+                            Âge moyen des appareils
                         </label>
                         <select name="age_appareils"
                                 class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                            <option value="recent">Récent (< 5 ans, classe A+++)</option>
-                            <option value="moyen" selected>Moyen (5-10 ans)</option>
-                            <option value="ancien">Ancien (> 10 ans)</option>
+                            <option value="recent">Récents (< 5 ans) - Classe A++/A+++</option>
+                            <option value="moyen" selected>Moyens (5-10 ans) - Classe A/A+</option>
+                            <option value="ancien">Anciens (> 10 ans) - Classe B/C</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Type de cuisson principal
+                        </label>
+                        <select name="type_cuisson"
+                                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            <option value="induction">Induction</option>
+                            <option value="vitroceramique">Vitrocéramique</option>
+                            <option value="electrique">Électrique classique</option>
+                            <option value="gaz">Gaz</option>
+                            <option value="mixte">Mixte (gaz + électrique)</option>
                         </select>
                     </div>
                 </div>
             </div>
             
-            <!-- ÉTAPE 5 : Cuisson -->
+            <!-- ÉTAPE 5 : Éclairage -->
             <div class="step" data-step="5">
                 <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
                     <span class="bg-purple-100 text-purple-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">5</span>
-                    🍳 Cuisson
-                </h2>
-                
-                <div class="space-y-6">
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            Type de plaques de cuisson <span class="text-red-500">*</span>
-                        </label>
-                        <select name="type_cuisson" required
-                                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                            <option value="induction">Induction</option>
-                            <option value="electrique">Électrique classique</option>
-                            <option value="gaz">Gaz</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- ÉTAPE 6 : Audiovisuel (NOUVELLE VERSION 3 NIVEAUX) -->
-            <div class="step" data-step="6">
-                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                    <span class="bg-purple-100 text-purple-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">6</span>
-                    📺 Audiovisuel & Multimédia
-                </h2>
-                
-                <div>
-                    <label class="block text-lg font-semibold text-gray-700 mb-4">
-                        Usage audiovisuel
-                        <span class="text-purple-600 cursor-help ml-1" title="Choisissez selon vos équipements">ℹ️</span>
-                    </label>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <!-- Usage Modéré -->
-                        <label class="usage-card border-2 rounded-xl p-5 cursor-pointer transition-all hover:shadow-lg">
-                            <input type="radio" name="usage_audiovisuel" value="modere" class="hidden">
-                            <div class="text-center">
-                                <div class="text-3xl mb-3">🟢</div>
-                                <div class="font-bold text-lg mb-2">Modéré</div>
-                                <div class="text-sm text-gray-600 mb-3">~150 kWh/pers/an</div>
-                                <div class="text-xs text-left text-gray-500 space-y-1">
-                                    <div><strong>Équipements :</strong></div>
-                                    <div>• Petite TV (&lt;42")</div>
-                                    <div>• Box internet</div>
-                                    <div>• 1 ordinateur</div>
-                                    <div>• Peu d'appareils en veille</div>
-                                </div>
-                            </div>
-                        </label>
-                        
-                        <!-- Usage Courant -->
-                        <label class="usage-card border-2 rounded-xl p-5 cursor-pointer transition-all hover:shadow-lg">
-                            <input type="radio" name="usage_audiovisuel" value="courant" checked class="hidden">
-                            <div class="text-center">
-                                <div class="text-3xl mb-3">🟡</div>
-                                <div class="font-bold text-lg mb-2">Courant</div>
-                                <div class="text-sm text-gray-600 mb-3">~250 kWh/pers/an</div>
-                                <div class="text-xs text-left text-gray-500 space-y-1">
-                                    <div><strong>Équipements :</strong></div>
-                                    <div>• TV moyenne (42-55")</div>
-                                    <div>• Box + Décodeur</div>
-                                    <div>• Ordinateur</div>
-                                    <div>• Console occasionnelle</div>
-                                </div>
-                            </div>
-                        </label>
-                        
-                        <!-- Usage Intensif -->
-                        <label class="usage-card border-2 rounded-xl p-5 cursor-pointer transition-all hover:shadow-lg">
-                            <input type="radio" name="usage_audiovisuel" value="intensif" class="hidden">
-                            <div class="text-center">
-                                <div class="text-3xl mb-3">🔴</div>
-                                <div class="font-bold text-lg mb-2">Intensif</div>
-                                <div class="text-sm text-gray-600 mb-3">~400 kWh/pers/an</div>
-                                <div class="text-xs text-left text-gray-500 space-y-1">
-                                    <div><strong>Équipements :</strong></div>
-                                    <div>• Grande TV (>65")</div>
-                                    <div>• Console souvent allumée</div>
-                                    <div>• Home-cinéma</div>
-                                    <div>• Appareils en veille permanente</div>
-                                </div>
-                            </div>
-                        </label>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- ÉTAPE 7 : Éclairage -->
-            <div class="step" data-step="7">
-                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                    <span class="bg-purple-100 text-purple-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">7</span>
                     💡 Éclairage
                 </h2>
                 
                 <div class="space-y-6">
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            Type d'ampoules principal <span class="text-red-500">*</span>
+                            Type d'éclairage majoritaire
                         </label>
-                        <select name="type_eclairage" required
+                        <select name="type_eclairage"
                                 class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                            <option value="LED" selected>LED (économiques)</option>
-                            <option value="mixte">Mixte (LED + halogène)</option>
-                            <option value="halogen">Halogène</option>
+                            <option value="LED">LED (100% LED)</option>
+                            <option value="fluocompactes">Fluocompactes (économiques)</option>
+                            <option value="incandescence">Incandescence / Halogènes</option>
+                            <option value="mixte">Mixte</option>
                         </select>
-                        <p class="text-xs text-gray-500 mt-1">💡 Les LED consomment 5× moins que les halogènes</p>
                     </div>
                 </div>
             </div>
             
-            <!-- ÉTAPE 8 : Contrat Électricité (NOUVELLE) -->
-            <div class="step" data-step="8">
+            <!-- ÉTAPE 6 : Usage Audiovisuel -->
+            <div class="step" data-step="6">
                 <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                    <span class="bg-purple-100 text-purple-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">8</span>
-                    ⚡ Votre Contrat Électricité
+                    <span class="bg-purple-100 text-purple-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">6</span>
+                    📺 Usage Audiovisuel
+                </h2>
+                
+                <div class="space-y-4">
+                    <p class="text-sm text-gray-600 mb-4">Sélectionnez votre profil d'usage</p>
+                    
+                    <label class="usage-card block p-4 border-2 rounded-lg cursor-pointer hover:bg-purple-50 transition">
+                        <input type="radio" name="usage_audiovisuel" value="faible" class="mr-3">
+                        <div class="inline-block">
+                            <div class="font-semibold">📱 Usage faible</div>
+                            <div class="text-sm text-gray-600">TV occasionnelle, peu d'appareils</div>
+                        </div>
+                    </label>
+                    
+                    <label class="usage-card block p-4 border-2 rounded-lg cursor-pointer hover:bg-purple-50 transition">
+                        <input type="radio" name="usage_audiovisuel" value="courant" checked class="mr-3">
+                        <div class="inline-block">
+                            <div class="font-semibold">📺 Usage courant</div>
+                            <div class="text-sm text-gray-600">TV quotidienne, ordinateur, quelques appareils</div>
+                        </div>
+                    </label>
+                    
+                    <label class="usage-card block p-4 border-2 rounded-lg cursor-pointer hover:bg-purple-50 transition">
+                        <input type="radio" name="usage_audiovisuel" value="eleve" class="mr-3">
+                        <div class="inline-block">
+                            <div class="font-semibold">🎮 Usage élevé</div>
+                            <div class="text-sm text-gray-600">Plusieurs TV, gaming, home cinéma</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 7 : Puissance Compteur -->
+            <div class="step" data-step="7">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                    <span class="bg-purple-100 text-purple-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">7</span>
+                    ⚡ Puissance Compteur
                 </h2>
                 
                 <div class="space-y-6">
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            Puissance de votre compteur <span class="text-red-500">*</span>
+                            Puissance souscrite
                         </label>
-                        <select name="puissance_compteur" required
+                        <select name="puissance_compteur"
                                 class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                            <option value="3kVA">3 kVA (studio, petit appartement)</option>
-                            <option value="6kVA" selected>6 kVA (standard, maison ou appartement)</option>
-                            <option value="9kVA">9 kVA (grande maison)</option>
-                            <option value="12kVA">12 kVA (chauffage élec + gros besoins)</option>
-                            <option value="15kVA">15 kVA (très gros besoins)</option>
+                            <option value="3kVA">3 kVA (petit logement)</option>
+                            <option value="6kVA" selected>6 kVA (standard)</option>
+                            <option value="9kVA">9 kVA (grand logement)</option>
+                            <option value="12kVA">12 kVA (très grand logement)</option>
+                            <option value="15kVA">15 kVA+</option>
                         </select>
-                        <p class="text-xs text-gray-500 mt-1">💡 Regardez sur votre facture ou votre compteur Linky</p>
                     </div>
+                </div>
+            </div>
+            
+            <!-- ÉTAPE 8 : Type de Contrat -->
+            <div class="step" data-step="8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                    <span class="bg-purple-100 text-purple-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">8</span>
+                    📋 Type de Contrat
+                </h2>
+                
+                <div class="space-y-4">
+                    <p class="text-sm text-gray-600 mb-4">Choisissez votre type de contrat électrique</p>
                     
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-3">
-                            Type de contrat <span class="text-red-500">*</span>
-                        </label>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <!-- Tarif Base -->
-                            <label class="contract-card border-2 rounded-xl p-5 cursor-pointer transition-all hover:shadow-lg">
-                                <input type="radio" name="type_contrat" value="base" checked class="hidden">
-                                <div class="text-center">
-                                    <div class="font-bold text-lg mb-2">Tarif Base</div>
-                                    <div class="text-sm text-gray-600 mb-3">Prix unique 24h/24</div>
-                                    <div class="text-2xl font-bold text-purple-600">0.2516 €/kWh</div>
-                                </div>
-                            </label>
-                            
-                            <!-- Tarif HP/HC -->
-                            <label class="contract-card border-2 rounded-xl p-5 cursor-pointer transition-all hover:shadow-lg">
-                                <input type="radio" name="type_contrat" value="hphc" class="hidden">
-                                <div class="text-center">
-                                    <div class="font-bold text-lg mb-2">Tarif HP/HC</div>
-                                    <div class="text-sm text-gray-600 mb-3">Heures Pleines / Creuses</div>
-                                    <div class="text-lg font-bold">
-                                        <span class="text-red-600">HP: 0.2700 €</span><br>
-                                        <span class="text-green-600">HC: 0.2068 €</span>
-                                    </div>
-                                </div>
-                            </label>
+                    <label class="contract-card block p-4 border-2 rounded-lg cursor-pointer hover:bg-purple-50 transition">
+                        <input type="radio" name="type_contrat" value="base" checked class="mr-3">
+                        <div class="inline-block">
+                            <div class="font-semibold">⚪ Tarif Base</div>
+                            <div class="text-sm text-gray-600">Prix unique 24h/24</div>
                         </div>
-                        
-                        <div class="mt-4 bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
-                            <div class="flex">
-                                <div class="flex-shrink-0">
-                                    <span class="text-blue-600 text-xl">💡</span>
-                                </div>
-                                <div class="ml-3 text-sm text-blue-700">
-                                    <strong>Astuce HP/HC :</strong><br>
-                                    HC = 22h-6h (8h/nuit)<br>
-                                    Économie possible si vous programmez vos appareils (lave-linge, chauffe-eau) la nuit
-                                </div>
-                            </div>
+                    </label>
+                    
+                    <label class="contract-card block p-4 border-2 rounded-lg cursor-pointer hover:bg-purple-50 transition">
+                        <input type="radio" name="type_contrat" value="hphc" class="mr-3">
+                        <div class="inline-block">
+                            <div class="font-semibold">🌙 Heures Pleines / Heures Creuses</div>
+                            <div class="text-sm text-gray-600">Prix réduit de 22h à 6h (8h/jour)</div>
                         </div>
-                    </div>
+                    </label>
                 </div>
             </div>
             
@@ -503,17 +449,10 @@
 let currentStep = 1;
 const totalSteps = 8;
 
-// Mode sélection
-function setMode(mode) {
+// ✅ NOUVELLE FONCTION : Sélection mode (Mode Rapide reste sur cette page)
+function selectMode(mode) {
     document.getElementById('mode-input').value = mode;
-    
-    if (mode === 'rapide') {
-        document.getElementById('mode-rapide-btn').classList.add('active');
-        document.getElementById('mode-expert-btn').classList.remove('active');
-    } else {
-        document.getElementById('mode-expert-btn').classList.add('active');
-        document.getElementById('mode-rapide-btn').classList.remove('active');
-    }
+    document.getElementById('mode-rapide-btn').classList.add('active');
 }
 
 // Navigation étapes

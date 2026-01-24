@@ -2,6 +2,13 @@
 Vues pour l'application frontend (site public).
 """
 
+from pydoc import html
+
+import json
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.http import HttpResponse
@@ -25,6 +32,12 @@ from .frontend_forms import InstallationForm
 from solar_calc.services.consumption_calculator import ConsumptionCalculator, calculate_consumption_from_form
 from solar_calc.services.expert_consumption_calculator import ExpertConsumptionCalculator
 from .models import ConsommationCalculee, AppareilConsommation, AppareillectriqueCategory 
+
+import weasyprint
+from datetime import datetime
+
+from battery.pricing import get_battery_price, compare_battery_brands
+from battery.services.sizing import recommend_battery_size, compare_battery_sizes
 
 logger = logging.getLogger(__name__)
 
@@ -84,9 +97,51 @@ class SimulationFormView(CreateView):
     form_class = InstallationForm
     template_name = 'frontend/simulation/form.html'
     
+    def get_initial(self):
+        """Pré-remplir le formulaire depuis la consommation"""
+        initial = super().get_initial()
+        
+        # Récupérer les données stockées en session
+        prefill_data = self.request.session.get('prefill_from_consumption')
+        
+        if prefill_data:
+            logger.info(f"Pré-remplissage formulaire PV depuis consommation {prefill_data['consommation_id']}")
+            
+            # Pré-remplir les champs du formulaire
+            initial.update({
+                # Champs de consommation (pas dans le modèle Installation)
+                'consommation_annuelle': prefill_data['consommation_annuelle'],
+                'nb_personnes': prefill_data['nb_personnes'],
+                'surface_habitable': prefill_data['surface_habitable'],
+                
+                # Localisation
+                'latitude': prefill_data['latitude'],
+                'longitude': prefill_data['longitude'],
+                'adresse': prefill_data.get('adresse', ''),
+                
+                # Configuration technique suggérée
+                'puissance_kw': prefill_data['puissance_suggeree'],
+                'orientation': prefill_data.get('orientation_suggeree', 'S'),  # ✅ 'S' pour Sud
+                'inclinaison': prefill_data.get('inclinaison_suggeree', 30),   # 30°
+            })
+            
+            # Stocker l'ID de consommation pour la relation
+            self.request.session['consommation_source_id'] = prefill_data['consommation_id']
+        
+        return initial
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['page'] = 'simulateur_gratuit'
+        
+        # Passer les données de pré-remplissage au template
+        prefill_data = self.request.session.get('prefill_from_consumption')
+        if prefill_data:
+            context['prefill_data'] = prefill_data
+            logger.info(f"📦 Données de pré-remplissage passées au template : {prefill_data['consommation_annuelle']} kWh/an")
+            # Nettoyer la session APRÈS avoir passé au template
+            del self.request.session['prefill_from_consumption']
+        
         return context
     
     def form_valid(self, form):
@@ -97,6 +152,16 @@ class SimulationFormView(CreateView):
         try:
             installation = form.save(commit=False)
             installation.user = self.request.user if self.request.user.is_authenticated else None
+            # Lier à la consommation source si elle existe
+            consommation_source_id = self.request.session.get('consommation_source_id')
+            if consommation_source_id:
+                try:
+                    consommation = ConsommationCalculee.objects.get(pk=consommation_source_id)
+                    installation.consommation_source = consommation
+                    logger.info(f"Installation liée à consommation {consommation_source_id}")
+                    del self.request.session['consommation_source_id']
+                except ConsommationCalculee.DoesNotExist:
+                    logger.warning(f"Consommation {consommation_source_id} introuvable")
             installation.save()
             
             # Créer la simulation
@@ -252,12 +317,47 @@ class SimulationResultsView(DetailView):
                 'production': resultat.production_horaire_kwh,
                 'consommation': resultat.consommation_horaire_kwh,
             }
-        
+
+            # Calculs batterie
+            try:
+                production_annuelle = resultat.production_annuelle_kwh
+                consommation_annuelle = resultat.consommation_annuelle_kwh
+                
+                # Recommander capacité optimale
+                capacite_optimale = recommend_battery_size(
+                    production_annuelle,
+                    consommation_annuelle,
+                    profile_type='actif_absent'  # À adapter selon ton profil
+                )
+                
+                # Comparer 4 capacités (5, 7, 10, 13.5 kWh)
+                battery_comparison = compare_battery_sizes(
+                    production_annuelle,
+                    consommation_annuelle,
+                    profile_type='actif_absent'
+                )
+                
+                # Prix de la batterie recommandée
+                battery_price = get_battery_price(capacite_optimale, marque='standard')
+                
+                # Ajouter au contexte
+                context.update({
+                    'battery_capacite_optimale': capacite_optimale,
+                    'battery_comparison': battery_comparison,
+                    'battery_price': battery_price,
+                })
+                
+                logger.info(f"✅ Batterie : {capacite_optimale} kWh recommandé ({battery_price['prix_total_ttc']}€)")
+                
+            except Exception as e:
+                logger.error(f"❌ Erreur calculs batterie : {str(e)}")
+                context['battery_capacite_optimale'] = None
+
         return context
 
 
 # ============== EXPORTS ==============
-# 🆕 Nouveaux : téléchargements
+# téléchargements
 
 def simulation_pdf_download(request, simulation_id):
     """
@@ -1253,3 +1353,337 @@ class ConsumptionExpertDetailsView(DetailView):
         })
         
         return context
+    
+# ============================================================================
+# TRANSITION CONSOMMATION → SIMULATION PV
+# ============================================================================
+
+def simulation_from_consumption(request, consommation_id):
+    """
+    Redirige vers le formulaire de simulation PV avec les données 
+    de consommation pré-remplies.
+    """
+    # Récupérer les données de consommation
+    consommation = get_object_or_404(ConsommationCalculee, pk=consommation_id)
+    
+    # Calculer une suggestion de puissance basée sur la consommation
+    production_moyenne_par_kwc = 1100  # kWh/an/kWc (moyenne France)
+    taux_autoconso_cible = 0.75  # 75% d'autoconsommation visée
+    
+    puissance_suggeree = (consommation.consommation_annuelle_totale * taux_autoconso_cible) / production_moyenne_par_kwc
+
+    # Arrondir à 0.5 kWc près
+    puissance_suggeree = round(puissance_suggeree * 2) / 2
+
+    # Limiter entre 1 kWc et 36 kWc
+    puissance_suggeree = max(1.0, min(36.0, puissance_suggeree))
+    
+    # Générer une adresse approximative depuis les coordonnées (ou laisser vide pour que l'utilisateur complète)
+    adresse_approx = f"Lat: {consommation.latitude:.4f}, Lon: {consommation.longitude:.4f}"
+
+    # Stocker les données en session pour pré-remplir le formulaire
+    request.session['prefill_from_consumption'] = {
+        'consommation_id': consommation.pk,
+        'consommation_annuelle': float(consommation.consommation_annuelle_totale),
+        'nb_personnes': consommation.nb_personnes,
+        'surface_habitable': float(consommation.surface_habitable),
+        'latitude': float(consommation.latitude),
+        'longitude': float(consommation.longitude),
+        'adresse': f"Lat: {consommation.latitude:.4f}, Lon: {consommation.longitude:.4f}",
+        'puissance_suggeree': float(puissance_suggeree),
+        'orientation_suggeree': 'S', # Plein sud
+        'inclinaison_suggeree': 30, # Angle optimal moyen
+    }
+    
+    # Message de confirmation
+    messages.success(
+        request, 
+        f"✅ Vos données de consommation ({consommation.consommation_annuelle_totale:.0f} kWh/an) "
+        f"ont été pré-remplies. Puissance suggérée : {puissance_suggeree} kWc"
+    )
+    
+    logger.info(
+        f"Transition consommation → simulation PV : "
+        f"Consommation {consommation.pk} ({consommation.consommation_annuelle_totale:.0f} kWh/an) → "
+        f"Puissance suggérée {puissance_suggeree} kWc"
+    )
+
+    # Rediriger vers le formulaire de simulation
+    return redirect('frontend:simulation_create')
+
+# ============================================================================
+# À AJOUTER DANS frontend/views.py
+# ============================================================================
+
+import json
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
+
+@require_http_methods(["POST"])
+def calculate_optimal_power(request):
+    """
+    Vue AJAX pour calculer la puissance optimale selon l'objectif.
+    Appelée depuis le formulaire de simulation (étape 3 → 4).
+    """
+    try:
+        # Parser les données JSON
+        data = json.loads(request.body)
+        
+        consommation = float(data.get('consommation', 0))
+        objectif = data.get('objectif', 'equilibre')
+        avec_batterie = data.get('batterie', False)
+        latitude = float(data.get('latitude', 45.0))
+        
+        # Validation
+        if consommation <= 0:
+            return JsonResponse({
+                'error': 'Consommation invalide'
+            }, status=400)
+        
+        # Appeler la fonction de calcul
+        resultat = calculer_puissance_optimale(
+            consommation_kwh=consommation,
+            objectif=objectif,
+            avec_batterie=avec_batterie,
+            latitude=latitude
+        )
+        
+        # Retourner le résultat
+        return JsonResponse(resultat)
+        
+    except Exception as e:
+        logger.error(f"Erreur calcul puissance optimale: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'error': f'Erreur serveur: {str(e)}'
+        }, status=500)
+
+
+def calculer_puissance_optimale(consommation_kwh, objectif, avec_batterie=False, latitude=45.0):
+    """
+    Calcule la puissance solaire optimale selon l'objectif choisi.
+    
+    Args:
+        consommation_kwh (float): Consommation annuelle en kWh
+        objectif (str): 'rentabilite', 'autonomie', 'equilibre', 'ecologie', 'revente'
+        avec_batterie (bool): Avec ou sans stockage batterie
+        latitude (float): Latitude du projet (pour estimer production)
+    
+    Returns:
+        dict: Résultats détaillés du dimensionnement
+    """
+    
+    # Production moyenne par kWc selon latitude
+    if latitude > 45:  # Nord France
+        production_par_kwc = 950
+    elif latitude < 43:  # Sud France  
+        production_par_kwc = 1300
+    else:  # Centre France
+        production_par_kwc = 1100
+    
+    # Tarifs 2025 (à actualiser)
+    PRIX_ACHAT = 0.2276  # €/kWh achat réseau
+    PRIX_VENTE_SURPLUS = 0.13  # €/kWh vente surplus
+    PRIX_VENTE_TOTALE_3KW = 0.2022  # €/kWh vente totale ≤3kWc
+    PRIX_VENTE_TOTALE_9KW = 0.1718  # €/kWh vente totale 3-9kWc
+    PRIX_VENTE_TOTALE_36KW = 0.1430  # €/kWh vente totale 9-36kWc
+    
+    # Coûts installation
+    COUT_KWC_SANS_BATTERIE = 2200  # €/kWc
+    COUT_KWC_AVEC_BATTERIE = 3000  # €/kWc
+    
+    # Calcul selon objectif
+    if objectif == 'rentabilite':
+        taux_cible = 0.70
+        explication = (
+            "🎯 Configuration optimisée pour le meilleur retour sur investissement. "
+            "Avec un taux d'autoconsommation de ~70%, vous maximisez vos économies "
+            "tout en limitant l'investissement initial."
+        )
+        
+    elif objectif == 'autonomie':
+        taux_cible = 1.20
+        explication = (
+            "⚡ Configuration pour maximiser votre indépendance énergétique. "
+            "Cette puissance couvre largement vos besoins, même en hiver. "
+            "Vous serez très peu dépendant du réseau électrique."
+        )
+        
+    elif objectif == 'equilibre':
+        taux_cible = 0.85
+        explication = (
+            "⚖️ Configuration équilibrée alliant autonomie et rentabilité. "
+            "Avec ~85% d'autoconsommation, vous profitez d'une belle indépendance "
+            "tout en gardant un retour sur investissement attractif."
+        )
+        
+    elif objectif == 'ecologie':
+        taux_cible = 1.50
+        explication = (
+            "🌍 Configuration pour maximiser votre production d'énergie verte. "
+            "Le surplus sera revendu au réseau et profitera à d'autres foyers. "
+            "Vous contribuez activement à la transition énergétique !"
+        )
+        
+    elif objectif == 'revente':
+        taux_cible = 1.50
+        explication = (
+            "💸 Configuration en VENTE TOTALE pour maximiser vos revenus. "
+            "Toute la production est vendue à EDF OA avec un tarif garanti 20 ans. "
+            "⚠️ Vous continuez à acheter votre électricité au tarif normal."
+        )
+    else:
+        taux_cible = 0.85
+        explication = "Configuration par défaut."
+    
+    # Calcul puissance
+    puissance_kw = (consommation_kwh * taux_cible) / production_par_kwc
+    
+    # Ajustement batterie
+    if avec_batterie and objectif != 'revente':
+        puissance_kw *= 1.15
+        explication += " ⚡ Puissance optimisée pour le stockage batterie."
+    
+    # Arrondir et limiter
+    puissance_kw = round(puissance_kw * 2) / 2
+    puissance_kw = max(1.0, min(36.0, puissance_kw))
+    
+    # Production annuelle
+    production = puissance_kw * production_par_kwc
+    
+    # Calculs financiers
+    if objectif == 'revente':
+        # VENTE TOTALE
+        autoconso = 0
+        surplus = production
+        taux_auto = 0
+        
+        # Tarif selon puissance
+        if puissance_kw <= 3:
+            tarif_vente = PRIX_VENTE_TOTALE_3KW
+        elif puissance_kw <= 9:
+            tarif_vente = PRIX_VENTE_TOTALE_9KW
+        else:
+            tarif_vente = PRIX_VENTE_TOTALE_36KW
+        
+        revenu = production * tarif_vente
+        cout_conso = consommation_kwh * PRIX_ACHAT
+        economie = revenu - cout_conso
+        
+    else:
+        # AUTOCONSOMMATION
+        facteur_sync = 0.65  # 65% de synchronisation prod/conso
+        autoconso = min(production * facteur_sync, consommation_kwh)
+        surplus = production - autoconso
+        taux_auto = (autoconso / production * 100) if production > 0 else 0
+        
+        eco_conso = autoconso * PRIX_ACHAT
+        revenu_surplus = surplus * PRIX_VENTE_SURPLUS
+        economie = eco_conso + revenu_surplus
+    
+    # ROI
+    cout_kwc = COUT_KWC_AVEC_BATTERIE if avec_batterie else COUT_KWC_SANS_BATTERIE
+    cout_total = puissance_kw * cout_kwc
+    roi = cout_total / economie if economie > 0 else 999
+    
+    return {
+        'puissance_kw': round(puissance_kw, 1),
+        'production_kwh': round(production, 0),
+        'autoconso_kwh': round(autoconso, 0),
+        'surplus_kwh': round(surplus, 0),
+        'taux_autoconso': round(taux_auto, 1),
+        'economie_annuelle': round(economie, 0),
+        'cout_installation': round(cout_total, 0),
+        'roi_annees': round(roi, 1),
+        'explication': explication,
+        'mode': 'vente_totale' if objectif == 'revente' else 'autoconsommation',
+        'orientation_optimale': 'S',  # Sud
+        'inclinaison_optimale': 30,  # 30° optimal France
+    }
+
+
+def export_pdf_expert(request, consommation_id):
+    """
+    Génère et télécharge un rapport PDF de l'analyse mode expert.
+    
+    Args:
+        request: Requête HTTP Django
+        consommation_id: ID de la ConsommationCalculee
+    
+    Returns:
+        HttpResponse avec le PDF en pièce jointe
+    """
+    try:
+        # Récupérer les données de consommation
+        consommation = get_object_or_404(ConsommationCalculee, pk=consommation_id)
+        appareils = consommation.appareils.all().order_by('-consommation_annuelle')
+        
+        # Grouper les appareils par catégorie
+        appareils_par_categorie = {}
+        for appareil in appareils:
+            cat = appareil.get_categorie_display()
+            if cat not in appareils_par_categorie:
+                appareils_par_categorie[cat] = []
+            appareils_par_categorie[cat].append(appareil)
+        
+        # Récupérer les données financières de la session
+        financier = request.session.get(f'financier_{consommation.pk}', {
+            'cout_total': consommation.consommation_annuelle_totale * 0.2276,
+            'prix_moyen_kwh': 0.2276    
+        })
+        
+        # Récupérer l'optimisation HP/HC de la session
+        optim_hphc = request.session.get(f'optim_hphc_{consommation.pk}', None)
+        
+        # Calculer la projection sur 10 ans
+        projection_10ans = []
+        prix_kwh_initial = financier.get('prix_moyen_kwh', 0.2276)
+        taux_inflation = 1.03  # 3% par an
+        cumul = 0
+        
+        for i in range(1, 11):
+            prix_kwh = prix_kwh_initial * (taux_inflation ** i)
+            cout_annuel = consommation.consommation_annuelle_totale * prix_kwh
+            cumul += cout_annuel
+            projection_10ans.append({
+                'annee': datetime.now().year + i,
+                'prix_kwh': prix_kwh,
+                'cout_annuel': cout_annuel,
+                'cumul': cumul
+            })
+        
+        # Préparer le contexte pour le template
+        context = {
+            'consommation': consommation,
+            'appareils': appareils,
+            'appareils_par_categorie': appareils_par_categorie,
+            'nb_appareils': appareils.count(),
+            'financier': financier,
+            'optim_hphc': optim_hphc,
+            'projection_10ans': projection_10ans,
+            'now': datetime.now(),
+        }
+        
+        # Rendre le template HTML
+        html_string = render_to_string('frontend/pdf/rapport_expert.html', context)
+        
+        # Générer le PDF avec WeasyPrint
+        html = weasyprint.HTML(string=html_string)
+        pdf_file = html.write_pdf()
+        
+        # Préparer la réponse HTTP
+        response = HttpResponse(pdf_file, content_type='application/pdf')
+        filename = f'rapport_consommation_{consommation.pk}_{datetime.now().strftime("%Y%m%d_%H%M")}.pdf'
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        logger.info(f"📄 PDF généré avec succès pour consommation {consommation.pk}")
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur lors de la génération du PDF: {str(e)}")
+        return HttpResponse(
+            f"Erreur lors de la génération du PDF: {str(e)}", 
+            status=500
+        )
+    

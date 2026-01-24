@@ -177,7 +177,91 @@
                 </div>
             </div>
         </div>
-        
+
+        <!-- ===== SECTION BATTERIE ===== -->
+        {% if battery_capacite_optimale %}
+        <div class="bg-white rounded-2xl shadow-lg p-8 mb-12">
+            <h2 class="text-2xl font-bold mb-6 flex items-center">
+                <i class="fas fa-battery-three-quarters text-green-600 mr-3"></i>
+                Optimisation avec Batterie
+            </h2>
+            
+            <!-- Recommandation -->
+            <div class="bg-green-50 border-l-4 border-green-500 p-6 mb-6 rounded-lg">
+                <h3 class="font-bold text-lg text-green-900 mb-2">
+                    💡 Capacité recommandée : {{ battery_capacite_optimale }} kWh
+                </h3>
+                <p class="text-green-800 mb-2">
+                    D'après votre profil de consommation, une batterie de 
+                    <strong>{{ battery_capacite_optimale }} kWh</strong> 
+                    offre le meilleur rapport gain/coût.
+                </p>
+                <div class="text-sm text-green-700 mt-3 space-y-1">
+                    <p><strong>Prix estimé :</strong> {{ battery_price.prix_total_ttc|floatformat:0 }}€ TTC installé</p>
+                    <p class="text-xs opacity-80">
+                        Dont matériel : {{ battery_price.prix_materiel|floatformat:0 }}€ • 
+                        Installation : {{ battery_price.prix_installation|floatformat:0 }}€ • 
+                        {{ battery_price.prix_par_kwh|floatformat:0 }}€/kWh
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Tableau comparaison -->
+            <h3 class="font-semibold text-lg mb-4 text-gray-800">📊 Comparaison de capacités</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full border-collapse">
+                    <thead>
+                        <tr class="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                            <th class="px-4 py-3 text-left rounded-tl-lg">Capacité</th>
+                            <th class="px-4 py-3 text-right">Autoconso</th>
+                            <th class="px-4 py-3 text-right">Gain</th>
+                            <th class="px-4 py-3 text-right">Prix TTC</th>
+                            <th class="px-4 py-3 text-right rounded-tr-lg">ROI</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for capacite, data in battery_comparison.items %}
+                        <tr class="{% if capacite == battery_capacite_optimale %}bg-green-50 font-semibold{% else %}hover:bg-gray-50{% endif %} transition">
+                            <td class="px-4 py-3">
+                                🔋 {{ capacite }} kWh
+                                {% if capacite == battery_capacite_optimale %}
+                                <span class="ml-2 px-2 py-1 bg-green-500 text-white text-xs rounded-full">⭐ Recommandé</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-right">
+                                <span class="text-green-600 font-semibold">{{ data.taux_autoconso_pct|floatformat:1 }}%</span>
+                            </td>
+                            <td class="px-4 py-3 text-right">
+                                <span class="text-green-600">+{{ data.gain_autoconso_pct|floatformat:1 }}%</span>
+                            </td>
+                            <td class="px-4 py-3 text-right font-semibold">
+                                {{ data.cout_batterie_euros|floatformat:0 }}€
+                            </td>
+                            <td class="px-4 py-3 text-right">
+                                <span class="{% if data.roi_ans < 40 %}text-green-600{% elif data.roi_ans < 50 %}text-orange-600{% else %}text-red-600{% endif %} font-semibold">
+                                    {{ data.roi_ans|floatformat:0 }} ans
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Note explicative -->
+            <div class="mt-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg">
+                <p class="text-sm text-blue-800">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    <strong>À savoir :</strong> Le ROI indiqué est basé sur les économies pures (gain d'autoconsommation × prix kWh). 
+                    Il peut être optimisé avec un tarif HP/HC ou si vous valorisez l'autonomie énergétique.
+                    Les prix sont basés sur le marché français 2025 (source : 25+ installateurs).
+                </p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- ===== FIN SECTION BATTERIE ===== -->
+
         <!-- Actions -->
         <div class="flex flex-col sm:flex-row gap-4 justify-center">
             <a href="{% url 'frontend:simulation_pdf_download' simulation_id=simulation.id %}" 

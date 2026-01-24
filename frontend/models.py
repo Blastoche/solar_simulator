@@ -40,6 +40,16 @@ class Installation(models.Model):
     inclinaison = models.IntegerField(help_text="Angle en degrés")
     type_toiture = models.CharField(max_length=50, choices=ROOF_TYPE_CHOICES)
     
+    # Lien avec l'analyse de consommation (optionnel)
+    consommation_source = models.ForeignKey(
+        'ConsommationCalculee',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='installations_generees',
+        verbose_name="Analyse de consommation source"
+    )
+
     # Métadonnées
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

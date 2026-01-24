@@ -202,6 +202,80 @@
             </div>
         </div>
         
+<!-- Section Call-to-Action : Simulation Solaire -->
+<div class="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl p-8 border-2 border-orange-200 shadow-lg mt-8">
+    <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+        <!-- Texte et avantages -->
+        <div class="flex-1">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="bg-orange-500 rounded-full p-3">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900">
+                    Passez à l'étape suivante !
+                </h3>
+            </div>
+            
+            <p class="text-gray-700 mb-4 text-lg">
+                Maintenant que vous connaissez votre consommation 
+                (<strong class="text-orange-600">{{ consommation.consommation_annuelle_totale|floatformat:0 }} kWh/an</strong>),
+                découvrez combien vous pourriez économiser avec des panneaux solaires.
+            </p>
+            
+            <ul class="space-y-2 mb-6">
+                <li class="flex items-start gap-2 text-gray-700">
+                    <svg class="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span><strong>Dimensionnement automatique</strong> basé sur votre consommation</span>
+                </li>
+                <li class="flex items-start gap-2 text-gray-700">
+                    <svg class="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span><strong>Production solaire estimée</strong> pour votre localisation</span>
+                </li>
+                <li class="flex items-start gap-2 text-gray-700">
+                    <svg class="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span><strong>Calcul des économies</strong> et retour sur investissement</span>
+                </li>
+            </ul>
+            
+            <div class="bg-orange-100 border-l-4 border-orange-500 p-4 rounded">
+                <p class="text-sm text-orange-800">
+                    💡 <strong>Gratuit et sans engagement :</strong> Vos données seront automatiquement utilisées 
+                    pour vous proposer la meilleure configuration solaire.
+                </p>
+            </div>
+        </div>
+        
+        <!-- Bouton Call-to-Action -->
+        <div class="flex-shrink-0">
+            <a href="{% url 'frontend:simulation_from_consumption' consommation.pk %}" 
+               class="inline-flex items-center px-8 py-5 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-xl font-bold text-lg hover:from-orange-600 hover:to-yellow-600 transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105">
+                <svg class="w-7 h-7 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 4 0 11-8 0 4 4 0 018 0z"></path>
+                </svg>
+                <div class="text-left">
+                    <div>Simuler mon</div>
+                    <div>installation solaire</div>
+                </div>
+                <svg class="w-6 h-6 ml-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                </svg>
+            </a>
+            
+            <p class="text-center text-sm text-gray-600 mt-3">
+                ⚡ Résultat en 2 minutes
+            </p>
+        </div>
+    </div>
+</div>
+
         <!-- Actions -->
         <div class="flex flex-col sm:flex-row gap-4 justify-center">
             <a href="{% url 'frontend:consumption_details' consommation.id %}" 

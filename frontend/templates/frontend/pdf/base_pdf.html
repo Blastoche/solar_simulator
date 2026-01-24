@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Rapport Solar Simulator{% endblock %}</title>
+    <style>
+        /* ============================================ */
+        /* CONFIGURATION PAGE */
+        /* ============================================ */
+        @page {
+            size: A4;
+            margin: 2cm 1.5cm;
+            
+            @top-center {
+                content: "Solar Simulator - Rapport de Consommation";
+                font-size: 10px;
+                color: #666;
+            }
+            
+            @bottom-right {
+                content: "Page " counter(page) " / " counter(pages);
+                font-size: 10px;
+                color: #666;
+            }
+        }
+        
+        /* ============================================ */
+        /* STYLES GÉNÉRAUX */
+        /* ============================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'DejaVu Sans', Arial, sans-serif;
+            font-size: 11px;
+            line-height: 1.6;
+            color: #333;
+        }
+        
+        h1 {
+            font-size: 24px;
+            color: #1e40af;
+            margin-bottom: 10px;
+            border-bottom: 3px solid #3b82f6;
+            padding-bottom: 10px;
+        }
+        
+        h2 {
+            font-size: 18px;
+            color: #1e40af;
+            margin: 25px 0 15px 0;
+            padding: 8px 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 5px;
+        }
+        
+        h3 {
+            font-size: 14px;
+            color: #1e40af;
+            margin: 15px 0 10px 0;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        p {
+            margin-bottom: 10px;
+        }
+        
+        /* ============================================ */
+        /* COMPOSANTS */
+        /* ============================================ */
+        
+        .page-break {
+            page-break-after: always;
+        }
+        
+        .no-break {
+            page-break-inside: avoid;
+        }
+        
+        /* En-tête de première page */
+        .header-cover {
+            text-align: center;
+            padding: 40px 0;
+            margin-bottom: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+        }
+        
+        .header-cover h1 {
+            color: white;
+            border: none;
+            font-size: 32px;
+            margin-bottom: 15px;
+        }
+        
+        .header-cover .subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        .header-cover .date {
+            margin-top: 20px;
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        
+        /* Cartes de statistiques */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .stat-card {
+            background: #f3f4f6;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .stat-card .label {
+            font-size: 10px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+        
+        .stat-card .value {
+            font-size: 22px;
+            font-weight: bold;
+            color: #1e40af;
+        }
+        
+        .stat-card .unit {
+            font-size: 12px;
+            color: #666;
+            margin-top: 2px;
+        }
+        
+        /* Tableaux */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 10px;
+        }
+        
+        table thead {
+            background: #1e40af;
+            color: white;
+        }
+        
+        table th {
+            padding: 10px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        table tbody tr:nth-child(even) {
+            background: #f9fafb;
+        }
+        
+        table tbody tr:hover {
+            background: #f3f4f6;
+        }
+        
+        table .text-right {
+            text-align: right;
+        }
+        
+        table .text-center {
+            text-align: center;
+        }
+        
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .badge-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .badge-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .badge-info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        /* Section d'information */
+        .info-box {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        .info-box.warning {
+            background: #fffbeb;
+            border-left-color: #f59e0b;
+        }
+        
+        .info-box.success {
+            background: #f0fdf4;
+            border-left-color: #10b981;
+        }
+        
+        .info-box-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #1e40af;
+        }
+        
+        /* Liste à puces stylisée */
+        ul.custom-list {
+            list-style: none;
+            margin: 10px 0;
+        }
+        
+        ul.custom-list li {
+            padding-left: 25px;
+            margin-bottom: 8px;
+            position: relative;
+        }
+        
+        ul.custom-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 5px;
+            color: #10b981;
+            font-weight: bold;
+        }
+        
+        /* Graphiques */
+        .chart-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .chart-container img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        /* Footer */
+        .footer {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 2px solid #e5e7eb;
+            font-size: 9px;
+            color: #666;
+            text-align: center;
+        }
+    </style>
+    
+    {% block extra_styles %}{% endblock %}
+</head>
+<body>
+    {% block content %}{% endblock %}
+</body>
+</html>
