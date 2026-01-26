@@ -444,7 +444,6 @@ solar_simulator/
     └── test_simulation.py                # Tests simulation
 
 
-
 ### Modules Principaux
 
 #### 1. Weather (Météo)
@@ -637,3 +636,4 @@ Pour toute question ou problème :
 **Made with ☀️ and ❤️ in France**# Solar Simulator 
  
 Simulateur de production solaire photovoltaique 
+
