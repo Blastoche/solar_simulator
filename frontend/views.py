@@ -196,6 +196,20 @@ class SimulationFormView(CreateView):
         """Retourner les erreurs du formulaire"""
         errors = {field: str(error[0]) for field, error in form.errors.items()}
         
+        # ===== DEBUG : AFFICHER LES ERREURS =====
+        print("\n" + "="*60)
+        print("❌ FORMULAIRE INVALIDE !")
+        print("="*60)
+        print("📝 DONNÉES REÇUES :")
+        for key, value in self.request.POST.items():
+            if key != 'csrfmiddlewaretoken':
+                print(f"   {key} = {value}")
+        print("\n🚫 ERREURS DE VALIDATION :")
+        for field, error in errors.items():
+            print(f"   {field}: {error}")
+        print("="*60 + "\n")
+        # ===== FIN DEBUG =====
+        
         # Pour les requêtes AJAX
         if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return HttpResponse({'status': 'error', 'errors': errors}, status=400)
@@ -327,14 +341,12 @@ class SimulationResultsView(DetailView):
                 capacite_optimale = recommend_battery_size(
                     production_annuelle,
                     consommation_annuelle,
-                    profile_type='actif_absent'  # À adapter selon ton profil
                 )
                 
                 # Comparer 4 capacités (5, 7, 10, 13.5 kWh)
                 battery_comparison = compare_battery_sizes(
                     production_annuelle,
                     consommation_annuelle,
-                    profile_type='actif_absent'
                 )
                 
                 # Prix de la batterie recommandée

@@ -1,106 +1,198 @@
-solar_simulator/                    ← RACINE DU PROJET
+solar_simulator/
 │
-├── 📄 requirements.txt             ← À LA RACINE
-├── 📄 requirements-dev.txt         ← À LA RACINE
-├── 📄 .env.example                 ← À LA RACINE
-├── 📄 .env                         ← À LA RACINE (à créer, pas versionné)
-├── 📄 .gitignore                   ← À LA RACINE
-├── 📄 README.md                    ← À LA RACINE
-├── 📄 manage.py                    ← À LA RACINE (créé par Django)
-
+├── 📄 manage.py                          # Point d'entrée Django
+├── 📄 requirements.txt                   # Dépendances production
+├── 📄 requirements-dev.txt               # Dépendances développement
+├── 📄 .env.example                       # Template variables d'environnement
+├── 📄 .env                               # Variables d'environnement (local)
+├── 📄 .gitignore                         # Fichiers ignorés git
+├── 📄 README.md                          # Documentation principale
 │
-├── 📂 venv/                        ← Environnement virtuel (ignoré par git)
+├── 📂 config/                            # 🔧 CONFIGURATION DJANGO
+│   ├── __init__.py
+│   ├── settings.py                       # Configuration globale
+│   ├── urls.py                           # Routage principal
+│   ├── wsgi.py                           # Déploiement WSGI
+│   └── asgi.py                           # Déploiement ASGI
 │
-├── 📂 docs/                        # DOCUMENTATION (optionnel)
-│   ├── structure.py                
-│   ├── architecture.py             
-│   ├── etat_simulateur.md          
+├── 📂 docs/                              # 📚 DOCUMENTATION
+│   ├── structure.py
+│   ├── architecture.py
+│   ├── etat_simulateur.md
 │   └── guide_windows.md
 │
-├── 📂 static/                      # Fichiers statiques globaux
+├── 📂 static/                            # 🎨 ASSETS GLOBAUX
 │   ├── css/
 │   ├── js/
 │   └── images/
 │
-├── 📂 media/                       # Uploads utilisateurs (créé auto)
+├── 📂 media/                             # 📁 UPLOADS UTILISATEURS (créé auto)
 │
-├── 📂 reports_output/              # Rapports PDF générés (créé auto)
+├── 📂 reports_output/                    # 📄 RAPPORTS PDF (créé auto)
 │
-├── 📂 logs/                        # Fichiers de logs (créé auto)
+├── 📂 logs/                              # 📋 LOGS (créé auto)
 │
-├── 📂 config/                      # CONFIGURATION DJANGO
-│   ├── __init__.py
-│   ├── settings.py                 # Settings principal
-│   ├── urls.py                     # URLs racine
-│   ├── wsgi.py
-│   └── asgi.py
 │
-├── 📂 core/                        # APP CORE
-│   ├── management/
-│	 │   ├── __init__.py
-│   │   ├── commands/               # Commandes Django custom 
-│   └── tests/
-│       ├── __init__.py
-│
-├── 📂 weather/                     # APP WEATHER
-│   ├── models.py                   # Modèles Django (WeatherData, etc.)
-│   ├── admin.py
-│   ├── services/                   # Services API
-│   │   ├── __init__.py
-│   │   ├── pvgis.py                # Client PVGIS
-│   │   ├── __pycache__/             
-│   ├── templates/
-│   ├── migrations/
-│   └── tests/
-│       ├── __init__.py
-│
-├── 📂 solar_calc/                  # APP SOLAR_CALC
-│   ├── models.py                   # Modèles Django ORM
-│   ├── admin.py
-│   ├── dataclasses/                # Modèles de calcul (dataclasses)
-│   │   ├── __init__.py
-│   │   ├── consumption.py          # ✅ TON FICHIER ENRICHI
-│   │   └── production.py           # ✅ TON FICHIER CRÉÉ
-│   ├── services/                   # Services métier
-│   │   ├── __init__.py
-│   │   ├── simulation.py           # Orchestration simulation
-│   ├── migrations/                
-│   └── tests/
-│       ├── __init__.py
-│
-├── 📂 battery/                     # APP BATTERY (future)
+├── 📂 core/                              # ⚙️ APP CORE - Utilitaires
 │   ├── __init__.py
 │   ├── models.py
+│   ├── admin.py
+│   ├── apps.py
+│   ├── management/
+│   │   ├── __init__.py
+│   │   └── commands/                     # Commandes Django custom
+│   ├── migrations/
+│   └── tests/
+│
+│
+├── 📂 weather/                           # 🌤️ APP WEATHER - Données météo
+│   ├── __init__.py
+│   ├── models.py                         # Modèles BD (cache données API)
+│   ├── admin.py
+│   ├── apps.py
 │   ├── services/
-│   │   └── battery_simulation.py
+│   │   ├── __init__.py
+│   │   ├── pvgis.py                      # Client API PVGIS (irradiation)
+│   │   └── openweather.py                # Client OpenWeatherMap
+│   ├── templates/
+│   │   └── weather/
+│   ├── migrations/
 │   └── tests/
 │
-├── 📂 financial/                   # APP FINANCIAL
-│   ├── services/                   
-│   ├── templates/                   
+│
+├── 📂 solar_calc/                        # ☀️ APP SOLAR_CALC - Cœur métier
+│   ├── __init__.py
+│   ├── models.py                         # Modèles Django ORM (persistance)
+│   ├── admin.py
+│   ├── apps.py
+│   │
+│   ├── dataclasses/                      # 📊 MODÈLES DE CALCUL (logique pure)
+│   │   ├── __init__.py
+│   │   ├── consumption.py                # Profils consommation électrique
+│   │   │   ├── ConsumptionProfile       # Classe pour calculs
+│   │   │   └── [méthodes de calcul]
+│   │   │
+│   │   └── production.py                 # Calculs production photovoltaïque
+│   │       ├── SolarInstallation        # Classe pour calculs
+│   │       └── [méthodes de calcul]
+│   │
+│   ├── services/                         # 🔗 SERVICES MÉTIER
+│   │   ├── __init__.py
+│   │   └── simulation.py                 # Orchestration complète
+│   │       └── SimulationOrchestrator    # Coordonne les calculs
+│   │
+│   ├── templates/
+│   │   └── solar_calc/
+│   ├── migrations/
 │   └── tests/
 │
-├── 📂 reporting/                   # APP REPORTING
-│   ├── services/                   
-│   ├── templates/                   
+│
+├── 📂 battery/                           # 🔋 APP BATTERY - Stockage (futur)
+│   ├── __init__.py
+│   ├── models.py
+│   ├── admin.py
+│   ├── apps.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   └── battery_simulation.py        # Logique batterie
+│   ├── migrations/
 │   └── tests/
 │
-├── 📂 frontend/                    # APP FRONTEND
-│   ├── views.py                    # Vues principales
-│   ├── urls.py
-│   ├── templates/                  # Templates HTML
-│   │   ├── base.html               # Template de base
-│   │   ├── frontend/
-│   │   ├── home.html               # Page d'accueil
-│   ├── static/                     # Fichiers statiques de l'app
+│
+├── 📂 financial/                         # 💰 APP FINANCIAL - Rentabilité
+│   ├── __init__.py
+│   ├── models.py
+│   ├── admin.py
+│   ├── apps.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── roi.py                        # Calcul ROI
+│   │   ├── van.py                        # Calcul VAN
+│   │   └── tri.py                        # Calcul TRI
+│   ├── templates/
+│   │   └── financial/
+│   ├── migrations/
+│   └── tests/
+│
+│
+├── 📂 reporting/                         # 📊 APP REPORTING - Rapports
+│   ├── __init__.py
+│   ├── models.py
+│   ├── admin.py
+│   ├── apps.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── pdf_generator.py              # Génération PDF
+│   │   ├── excel_exporter.py             # Export Excel/CSV
+│   │   └── charts.py                     # Graphiques
+│   ├── templates/
+│   │   └── reporting/
+│   ├── migrations/
+│   └── tests/
+│
+│
+├── 📂 frontend/                          # 🎨 APP FRONTEND - Interface web
+│   ├── __init__.py
+│   ├── models.py                         # Modèles (utilisateurs, projets, etc.)
+│   ├── admin.py
+│   ├── apps.py
+│   ├── views.py                          # Vues Django (contrôleurs)
+│   ├── urls.py                           # Routage app
+│   ├── forms.py                          # Formulaires Django
+│   │
+│   ├── management/
+│   │   ├── __init__.py
+│   │   └── commands/                     # Commandes custom
+│   │
+│   ├── middleware/
+│   │   ├── __init__.py
+│   │   └── [middlewares custom]
+│   │
+│   ├── templatetags/
+│   │   ├── __init__.py
+│   │   └── custom_filters.py             # Filtres Jinja2 custom
+│   │
+│   ├── services/
+│   │   ├── __init__.py
+│   │   └── [services métier]
+│   │
+│   ├── static/
 │   │   └── frontend/
-│   │       ├── css/
-│   │       ├── js/
+│   │       ├── css/                      # Styles Tailwind
+│   │       ├── js/                       # Alpine.js + HTMX
 │   │       └── images/
-│   └── tests/
+│   │
+│   ├── templates/
+│   │   └── frontend/
+│   │       ├── base.html                 # Template parent
+│   │       ├── home.html                 # Page d'accueil
+│   │       ├── consumption/
+│   │       │   ├── list.html
+│   │       │   ├── detail.html
+│   │       │   └── form.html
+│   │       ├── simulation/
+│   │       │   ├── list.html
+│   │       │   ├── detail.html
+│   │       │   └── form.html
+│   │       ├── legal/
+│   │       │   ├── privacy.html
+│   │       │   └── terms.html
+│   │       └── pdf/
+│   │           └── [templates PDF]
+│   │
+│   ├── migrations/
+│   ├── tests/
+│   │   ├── __init__.py
+│   │   ├── test_views.py
+│   │   ├── test_forms.py
+│   │   └── fixtures/
+│   │       └── [données test]
+│   └── __init__.py
 │
-└── 📂 tests/                       # TESTS GLOBAUX (optionnel)
-    ├── test_pvgis.py
-    ├── test_pvgis_simple.py               
-    └── test_pvgis_v53_discovery.py
-    ├── test_simulation.py
+│
+└── 📂 tests/                             # 🧪 TESTS GLOBAUX
+    ├── __init__.py
+    ├── test_pvgis.py                     # Tests API PVGIS
+    ├── test_pvgis_simple.py
+    ├── test_pvgis_v53_discovery.py
+    └── test_simulation.py                # Tests simulation

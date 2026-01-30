@@ -30,7 +30,7 @@ class Installation(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='frontend_installations')
     
     # Localisation
-    adresse = models.CharField(max_length=255)
+    adresse = models.CharField(max_length=500, blank=True, default='')
     latitude = models.FloatField()
     longitude = models.FloatField()
     
