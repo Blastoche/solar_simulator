@@ -23,16 +23,30 @@ class SimulationCalculator:
         Args:
             installation: Objet Installation Django
         """
+
+        # ===== INITIALISATION DES ATTRIBUTS (IMPORTANT !) =====
         self.installation = installation
         self.puissance_kw = installation.puissance_kw
         self.orientation = installation.orientation
         self.inclinaison = installation.inclinaison
-        
-        # Coefficients de rendement
-        self.rendement_panneaux = 0.20  # 20%
-        self.rendement_onduleur = 0.98  # 98%
-        self.rendement_cablage = 0.99   # 99%
-        self.rendement_global = self.rendement_panneaux * self.rendement_onduleur * self.rendement_cablage
+
+        # Coefficients de rendement système (Performance Ratio)
+        # Le rendement panneau est DÉJÀ inclus dans la puissance crête (kWc)
+
+        self.rendement_onduleur = 0.95      # 95% (pertes onduleur + conversion DC/AC)
+        self.rendement_cablage = 0.98       # 98% (pertes câblage DC et AC)
+        self.rendement_salissure = 0.95     # 95% (salissure panneaux)
+        self.rendement_mismatch = 0.98      # 98% (différences entre panneaux)
+        self.rendement_disponibilite = 0.98 # 98% (pannes, maintenance)
+
+        # Performance Ratio total = ~85% (réaliste pour France)
+        self.rendement_global = (
+            self.rendement_onduleur * 
+            self.rendement_cablage * 
+            self.rendement_salissure * 
+            self.rendement_mismatch * 
+            self.rendement_disponibilite
+        )
         
         logger.info(f"✅ Calculatrice initialisée pour {self.puissance_kw}kWc")
     
@@ -217,23 +231,21 @@ class SimulationCalculator:
             'autoconso_ratio': autoconso_ratio,
             'injection': round(injection_kwh, 2),
         }
-    
-    
-    def calculate_consumption(self):
-        """
-        Calcule la consommation électrique estimée.
         
-        Returns:
-            Dict avec:
-            - annuelle: Consommation annuelle en kWh
-            - monthly: Liste de 12 valeurs mensuelles
-            - daily: Profil horaire (24 valeurs)
+    def calculate_consumption(self, consommation_annuelle=None):
         """
+        Calcule la consommation électrique.
         
+        Args:
+            consommation_annuelle: Consommation annuelle en kWh (si None, utilise 3500 par défaut)
+        """
         logger.info("⚡ Calcul de la consommation...")
         
-        # Consommation estimée par défaut : 3 500 kWh/an (France moyenne)
-        consumption_annuelle = 3500.0
+        # Utiliser la consommation fournie ou valeur par défaut
+        if consommation_annuelle is None:
+            consommation_annuelle = getattr(self.installation, 'consommation_annuelle', 3500.0)
+        
+        consumption_annuelle = float(consommation_annuelle)
         
         # Distribution mensuelle (légère variation saisonnière)
         # Plus élevée en hiver (chauffage, éclairage)

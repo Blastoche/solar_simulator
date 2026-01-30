@@ -54,7 +54,10 @@ def run_simulation_task(self, simulation_id):
             meta={'percentage': 70, 'message': '⚡ Calcul de consommation...'}
         )
         
-        consumption = calculator.calculate_consumption()
+        # Récupérer la consommation depuis l'installation
+        consommation_annuelle = getattr(installation, 'consommation_annuelle', 6000)
+        consumption = calculator.calculate_consumption(consommation_annuelle=consommation_annuelle)
+        
         logger.info(f"Sim {simulation_id}: Consommation calculée = {consumption['annuelle']} kWh")
         
         # ===== ÉTAPE 4: Financier (90%) =====
