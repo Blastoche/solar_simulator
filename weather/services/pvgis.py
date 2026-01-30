@@ -456,3 +456,4 @@ def get_pvgis_weather_data(
     )
     
     return df, metadata
+
