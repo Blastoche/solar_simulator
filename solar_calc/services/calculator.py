@@ -10,12 +10,23 @@ import json
 import pandas as pd
 import numpy as np
 
+from solar_calc.contracts import (
+    ProductionResult,
+    ConsumptionResult,
+    FinancialResult,
+    validate_production_result,
+    validate_consumption_result
+)
+
+from solar_calc.services.hourly_calculator import HourlyAutoconsumptionCalculator
+from solar_calc.services.consumption_profiles import ConsumptionProfiles
+
 logger = logging.getLogger(__name__)
 
 
 class SimulationCalculator:
     """Classe pour calculer la production et consommation solaire"""
-    
+
     def __init__(self, installation):
         """
         Initialise la calculatrice avec les paramètres de l'installation.
@@ -26,9 +37,9 @@ class SimulationCalculator:
 
         # ===== INITIALISATION DES ATTRIBUTS (IMPORTANT !) =====
         self.installation = installation
-        self.puissance_kw = installation.puissance_kw
-        self.orientation = installation.orientation
-        self.inclinaison = installation.inclinaison
+        self.puissance_kw = installation.puissance_crete_kwc 
+        self.orientation = installation.orientation_azimut  
+        self.inclinaison = installation.inclinaison_degres  
 
         # Coefficients de rendement système (Performance Ratio)
         # Le rendement panneau est DÉJÀ inclus dans la puissance crête (kWc)
@@ -166,22 +177,98 @@ class SimulationCalculator:
             # Profil par défaut (courbe en cloche)
             production_hourly = self._get_default_hourly_pattern(production_annuelle / 8760)
         
-        # Autoconsommation (par défaut 70%)
-        autoconso_ratio = 70.0
-        autoconso_kwh = production_annuelle * (autoconso_ratio / 100)
-        injection_kwh = production_annuelle - autoconso_kwh
+        # ===== CALCUL AUTOCONSOMMATION HORAIRE PERSONNALISÉ =====
         
-        logger.info(f"📈 Production annuelle : {production_annuelle:.2f} kWh")
-        logger.info(f"⚡ Autoconsommation : {autoconso_ratio}%")
+        # Récupérer les paramètres de consommation
+        consommation_annuelle = getattr(self.installation, 'consommation_annuelle', 3500.0)
+        profile_type = getattr(self.installation, 'profile_type', 'actif_absent')
+
+        # Vérifier si on a des données d'appareils détaillées
+        appareils_json = getattr(self.installation, 'appareils_json', None)
+
+        logger.info(f"📊 Génération profil consommation ({profile_type}, {consommation_annuelle:.0f} kWh/an)")
+
+        # Générer le profil de consommation horaire
+        try:
+            if appareils_json:
+                # CAS 1 : On a les détails des appareils → Profil PERSONNALISÉ
+                try:
+                    appareils_data = json.loads(appareils_json)
+                    logger.info(f"✅ Utilisation profil personnalisé avec {len(appareils_data.get('appareils', {}))} appareils")
+                    
+                    consommation_horaire_kw = ConsumptionProfiles.generate_personalized_pattern(
+                        profile_type=profile_type,
+                        consommation_totale=consommation_annuelle,
+                        appareils_data=appareils_data,
+                        optimized=False  # Version normale (pas optimisée)
+                    )
+                except (json.JSONDecodeError, KeyError, TypeError, AttributeError) as e:
+                    logger.warning(f"⚠️ Erreur parsing appareils_json : {e}. Fallback sur profil générique")
+                    # Fallback sur profil générique
+                    pattern_brut = ConsumptionProfiles.generate_yearly_pattern(
+                        profile_type=profile_type,
+                        add_randomness=True
+                    )
+                    consommation_horaire_kw = pattern_brut / pattern_brut.sum() * consommation_annuelle
+            else:
+                # CAS 2 : Pas de détails → Profil GÉNÉRIQUE
+                logger.info(f"ℹ️ Utilisation profil générique (pas d'appareils détaillés)")
+                
+                pattern_brut = ConsumptionProfiles.generate_yearly_pattern(
+                    profile_type=profile_type,
+                    add_randomness=True
+                )
+                
+                # Normaliser pour correspondre à la consommation annuelle
+                consommation_horaire_kw = pattern_brut / pattern_brut.sum() * consommation_annuelle
+            
+            # Vérifier qu'on a bien 8760 valeurs
+            if len(consommation_horaire_kw) != 8760:
+                logger.error(f"❌ Profil consommation invalide : {len(consommation_horaire_kw)} valeurs au lieu de 8760")
+                # Fallback sur ratio fixe
+                autoconso_ratio = 70.0
+                autoconso_kwh = production_annuelle * (autoconso_ratio / 100)
+                injection_kwh = production_annuelle - autoconso_kwh
+            else:
+                # Calculer l'autoconsommation RÉELLE heure par heure
+                hourly_calc = HourlyAutoconsumptionCalculator(puissance_kwc=self.puissance_kw)
+                
+                hourly_results = hourly_calc.calculate(
+                    production_horaire_kw=df_calc['production_kw'].values,  # numpy array 8760 valeurs
+                    consommation_horaire_kw=consommation_horaire_kw  # numpy array 8760 valeurs
+                )
+                
+                # Utiliser les résultats RÉELS
+                autoconso_ratio = hourly_results.taux_autoconsommation_pct
+                autoconso_kwh = hourly_results.autoconsommation_kwh
+                injection_kwh = hourly_results.injection_reseau_kwh
+                autoproduction_ratio = hourly_results.taux_autoproduction_pct
+                
+                logger.info(f"✅ Autoconsommation RÉELLE calculée (heure par heure)")
+                logger.info(f"📊 Taux autoconsommation : {autoconso_ratio:.1f}%")
+                logger.info(f"🏠 Taux autoproduction : {autoproduction_ratio:.1f}%")
+        
+        except Exception as e:
+            logger.error(f"❌ Erreur calcul autoconsommation : {e}")
+            # Fallback sur ratio fixe en cas d'erreur
+            autoconso_ratio = 70.0
+            autoconso_kwh = production_annuelle * (autoconso_ratio / 100)
+            injection_kwh = production_annuelle - autoconso_kwh
+            autoproduction_ratio = 0.0    
+            
+            logger.info(f"📈 Production annuelle : {production_annuelle:.2f} kWh")
+            logger.info(f"⚡ Autoconsommation : {autoconso_kwh:.2f} kWh ({autoconso_ratio:.1f}%)")
+            logger.info(f"📤 Injection réseau : {injection_kwh:.2f} kWh")
         
         return {
             'annuelle': round(production_annuelle, 2),
             'monthly': production_monthly,
             'daily': production_hourly,
             'autoconso_ratio': autoconso_ratio,
+            'autoproduction_ratio': autoproduction_ratio if 'autoproduction_ratio' in locals() else 0.0,
+            'autoconso_kwh': autoconso_kwh,
             'injection': round(injection_kwh, 2),
         }
-    
     
     def _calculate_from_dict(self, weather_data: dict):
         """
@@ -459,3 +546,119 @@ class SimulationCalculator:
                 0,    # 23h
             ]
         }
+    # ===== MÉTHODES AVEC CONTRATS GARANTIS =====
+    
+    def calculate_production_normalized(self, weather_data) -> ProductionResult:
+        """
+        Calcule la production avec contrat garanti.
+        
+        CONTRAT :
+            Input : DataFrame météo 8760h ou dict
+            Output : ProductionResult avec tous les champs garantis
+        
+        Args:
+            weather_data: DataFrame PVGIS ou dict
+        
+        Returns:
+            ProductionResult avec structure garantie
+        
+        Example:
+            >>> result = calc.calculate_production_normalized(weather_df)
+            >>> print(result.annuelle)  # 5903.36
+            >>> print(len(result.monthly))  # 12
+        """
+        # Appeler la fonction existante
+        result_dict = self.calculate_production(weather_data)
+        
+        # Valider
+        validate_production_result(result_dict)
+        
+        # Calculer production spécifique
+        specifique = round(result_dict['annuelle'] / self.puissance_kw, 2)
+        
+        # Créer objet structuré
+        return ProductionResult(
+            annuelle=result_dict['annuelle'],
+            specifique=specifique,
+            monthly=result_dict['monthly'],
+            daily=result_dict['daily'],
+            autoconso_ratio=result_dict['autoconso_ratio'],
+            injection=result_dict['injection'],
+            performance_ratio=self.rendement_global
+        )
+    
+    def calculate_consumption_normalized(
+        self, 
+        consommation_annuelle: float = None
+    ) -> ConsumptionResult:
+        """
+        Calcule la consommation avec contrat garanti.
+        
+        CONTRAT :
+            Input : consommation annuelle (kWh) optionnelle
+            Output : ConsumptionResult avec structure garantie
+        
+        Args:
+            consommation_annuelle: Consommation souhaitée (kWh)
+        
+        Returns:
+            ConsumptionResult avec structure garantie
+        """
+        # Appeler fonction existante
+        result_dict = self.calculate_consumption(consommation_annuelle)
+        
+        # Valider
+        validate_consumption_result(result_dict)
+        
+        # Déterminer source
+        if consommation_annuelle is not None:
+            source = 'formulaire'
+        elif hasattr(self.installation, 'consommation_annuelle'):
+            source = 'installation'
+        else:
+            source = 'defaut'
+        
+        # Créer objet structuré
+        return ConsumptionResult(
+            annuelle=result_dict['annuelle'],
+            monthly=result_dict['monthly'],
+            daily=result_dict['daily'],
+            source=source
+        )
+    
+    def calculate_financial_normalized(
+        self, 
+        production: ProductionResult, 
+        consumption: ConsumptionResult
+    ) -> FinancialResult:
+        """
+        Calcule les données financières avec contrat garanti.
+        
+        CONTRAT :
+            Input : ProductionResult + ConsumptionResult
+            Output : FinancialResult avec payback calculé
+        
+        Args:
+            production: Résultat de production
+            consumption: Résultat de consommation
+        
+        Returns:
+            FinancialResult avec tous les indicateurs
+        """
+        # Convertir en dict pour fonction existante
+        prod_dict = production.to_dict()
+        cons_dict = consumption.to_dict()
+        
+        # Appeler fonction existante
+        result_dict = self.calculate_financial(prod_dict, cons_dict)
+        
+        # Coût installation
+        cout = self.puissance_kw * 1800  # €/kWc
+        
+        # Créer objet structuré (calcule payback auto)
+        return FinancialResult(
+            economie_annuelle=result_dict['economie_annuelle'],
+            roi_25ans=result_dict['roi'],
+            taux_rentabilite=result_dict['taux_rentabilite'],
+            cout_installation=cout
+        )

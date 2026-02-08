@@ -1,8 +1,8 @@
-"""
-Modèles Django pour l'app solar_calc
+﻿"""
+ModÃ¨les Django pour l'app solar_calc
 
-Ces modèles Django (ORM) stockent les données en base de données.
-Les modèles de calcul (dataclasses) sont dans solar_calc/models/
+Ces modÃ¨les Django (ORM) stockent les donnÃ©es en base de donnÃ©es.
+Les modÃ¨les de calcul (dataclasses) sont dans solar_calc/models/
 """
 
 from django.db import models
@@ -14,12 +14,12 @@ import json
 
 class SolarInstallationModel(models.Model):
     """
-    Configuration d'une installation solaire (stockage en base de données).
+    Configuration d'une installation solaire (stockage en base de donnÃ©es).
     """
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='solar_installations')
     nom = models.CharField(max_length=200, verbose_name="Nom de l'installation")
     
-    # Géolocalisation
+    # GÃ©olocalisation
     latitude = models.FloatField(
         validators=[MinValueValidator(-90), MaxValueValidator(90)],
         verbose_name="Latitude"
@@ -43,12 +43,12 @@ class SolarInstallationModel(models.Model):
     orientation_azimut = models.FloatField(
         validators=[MinValueValidator(0), MaxValueValidator(360)],
         default=180,
-        verbose_name="Orientation (azimut en degrés)"
+        verbose_name="Orientation (azimut en degrÃ©s)"
     )
     inclinaison_degres = models.FloatField(
         validators=[MinValueValidator(0), MaxValueValidator(90)],
         default=30,
-        verbose_name="Inclinaison (degrés)"
+        verbose_name="Inclinaison (degrÃ©s)"
     )
     facteur_ombrage = models.FloatField(
         validators=[MinValueValidator(0), MaxValueValidator(1)],
@@ -72,7 +72,7 @@ class SolarInstallationModel(models.Model):
         verbose_name="Puissance onduleur (kW)"
     )
     
-    # Métadonnées
+    # MÃ©tadonnÃ©es
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -86,36 +86,25 @@ class SolarInstallationModel(models.Model):
     
     @property
     def puissance_crete_kwc(self):
-        """Puissance crête totale en kWc."""
+        """Puissance crÃªte totale en kWc."""
         return (self.nombre_panneaux * self.puissance_panneau_wc) / 1000
 
 
 class ConsumptionProfileModel(models.Model):
     """
-    Profil de consommation électrique d'un logement.
+    Profil de consommation Ã©lectrique d'un logement.
     """
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='consumption_profiles')
     nom = models.CharField(max_length=200, verbose_name="Nom du profil")
     
     # Logement
-    periode_construction = models.CharField(
-        max_length=20,
-        blank=True,
-        null=True,
-        choices=[
-            ('', 'Non renseignée'),
-            ('avant_1975', 'Avant 1975'),
-            ('1975_2000', '1975-2000'),
-            ('2000_2012', '2000-2012'),
-            ('2013_2020', '2013-2020'),
-            ('apres_2021', 'Après 2021'),
-        ],
-        verbose_name="Période de construction"
+    annee_construction = models.IntegerField(
+        validators=[MinValueValidator(1800), MaxValueValidator(2030)],
+        verbose_name="AnnÃ©e de construction"
     )
-    
     surface_habitable = models.FloatField(
         validators=[MinValueValidator(10)],
-        verbose_name="Surface habitable (m²)"
+        verbose_name="Surface habitable (mÂ²)"
     )
     nb_personnes = models.IntegerField(
         validators=[MinValueValidator(1)],
@@ -123,20 +112,19 @@ class ConsumptionProfileModel(models.Model):
     )
     dpe = models.CharField(
         max_length=1,
-        choices=[('', 'Je ne connais pas mon DPE'),('A', 'A'), ('B', 'B'), ('C', 'C'), ('D', 'D'), 
+        choices=[('A', 'A'), ('B', 'B'), ('C', 'C'), ('D', 'D'), 
                  ('E', 'E'), ('F', 'F'), ('G', 'G')],
-        blank=True,
-        null=True,
-        verbose_name="DPE (Diagnostic de Performance Énergétique)"
+        default='C',
+        verbose_name="DPE"
     )
     
-    # Systèmes énergétiques
+    # SystÃ¨mes Ã©nergÃ©tiques
     type_chauffage = models.CharField(
         max_length=50,
         choices=[
-            ('non_electrique', 'Non électrique'),
-            ('electrique', 'Électrique'),
-            ('pompe_a_chaleur', 'Pompe à chaleur'),
+            ('non_electrique', 'Non Ã©lectrique'),
+            ('electrique', 'Ã‰lectrique'),
+            ('pompe_a_chaleur', 'Pompe Ã  chaleur'),
         ],
         default='non_electrique',
         verbose_name="Type de chauffage"
@@ -144,8 +132,8 @@ class ConsumptionProfileModel(models.Model):
     type_ecs = models.CharField(
         max_length=50,
         choices=[
-            ('non_electrique', 'Non électrique'),
-            ('electrique', 'Électrique'),
+            ('non_electrique', 'Non Ã©lectrique'),
+            ('electrique', 'Ã‰lectrique'),
             ('thermodynamique', 'Thermodynamique'),
         ],
         default='non_electrique',
@@ -156,14 +144,14 @@ class ConsumptionProfileModel(models.Model):
     profile_type = models.CharField(
         max_length=20,
         choices=[
-            ('actif_absent', 'Actif absent en journée (travail externe)'),
-            ('teletravail', 'Télétravail / Présence en journée'),
-            ('retraite', 'Retraité (présent toute la journée)'),
+            ('actif_absent', 'Actif absent en journÃ©e (travail externe)'),
+            ('teletravail', 'TÃ©lÃ©travail / PrÃ©sence en journÃ©e'),
+            ('retraite', 'RetraitÃ© (prÃ©sent toute la journÃ©e)'),
             ('famille', 'Famille avec enfants'),
         ],
         default='actif_absent',
         verbose_name="Type de profil d'occupation",
-        help_text="Définit le pattern de consommation selon le mode de vie"
+        help_text="DÃ©finit le pattern de consommation selon le mode de vie"
     )
     
     # Appareils (stockage JSON simple)
@@ -173,14 +161,14 @@ class ConsumptionProfileModel(models.Model):
         verbose_name="Configuration des appareils (JSON)"
     )
     
-    # Consommation calculée
+    # Consommation calculÃ©e
     consommation_annuelle_kwh = models.FloatField(
         null=True,
         blank=True,
         verbose_name="Consommation annuelle (kWh)"
     )
     
-    # Métadonnées
+    # MÃ©tadonnÃ©es
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -192,34 +180,10 @@ class ConsumptionProfileModel(models.Model):
     def __str__(self):
         return f"{self.nom} ({self.consommation_annuelle_kwh or 0:.0f} kWh/an)"
 
-    def get_effective_dpe(self):
-        """
-        Retourne le DPE effectif en fonction des données disponibles.
-        Priorité : DPE renseigné > Estimation via période
-        """
-        # Si DPE renseigné, on l'utilise directement
-        if self.dpe:
-            return self.dpe
-        
-        # Sinon, on estime le DPE depuis la période de construction
-        periode_to_dpe = {
-            'avant_1975': 'F',  # Pas d'isolation
-            '1975_2000': 'E',   # Isolation basique
-            '2000_2012': 'D',   # RT 2000/2005
-            '2013_2020': 'C',   # RT 2012
-            'apres_2021': 'B',  # RE 2020
-        }
-        
-        if self.periode_construction and self.periode_construction in periode_to_dpe:
-            return periode_to_dpe[self.periode_construction]
-        
-        # Si ni DPE ni période : retourner None
-        return None
-    
 
 class SimulationModel(models.Model):
     """
-    Résultat d'une simulation complète (production + consommation).
+    RÃ©sultat d'une simulation complÃ¨te (production + consommation).
     """
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='simulations')
     installation = models.ForeignKey(
@@ -233,78 +197,4 @@ class SimulationModel(models.Model):
         related_name='simulations'
     )
     
-    # Résultats de production
-    production_annuelle_kwh = models.FloatField(
-        verbose_name="Production annuelle (kWh)"
-    )
-    production_specifique_kwh_kwc = models.FloatField(
-        verbose_name="Production spécifique (kWh/kWc/an)"
-    )
-    
-    # Résultats de consommation
-    consommation_annuelle_kwh = models.FloatField(
-        verbose_name="Consommation annuelle (kWh)"
-    )
-    
-    # Résultats d'autoconsommation
-    autoconsommation_kwh = models.FloatField(
-        verbose_name="Autoconsommation (kWh)"
-    )
-    injection_reseau_kwh = models.FloatField(
-        verbose_name="Injection réseau (kWh)"
-    )
-    achat_reseau_kwh = models.FloatField(
-        verbose_name="Achat réseau (kWh)"
-    )
-    taux_autoconsommation_pct = models.FloatField(
-        verbose_name="Taux d'autoconsommation (%)"
-    )
-    taux_autoproduction_pct = models.FloatField(
-        verbose_name="Taux d'autoproduction (%)"
-    )
-    
-    # Données horaires (stockage JSON compressé ou fichier)
-    donnees_horaires_url = models.CharField(
-        max_length=500,
-        blank=True,
-        null=True,
-        verbose_name="URL des données horaires"
-    )
-    
-    # Statut
-    status = models.CharField(
-        max_length=20,
-        choices=[
-            ('pending', 'En attente'),
-            ('running', 'En cours'),
-            ('completed', 'Terminée'),
-            ('failed', 'Échouée'),
-        ],
-        default='pending',
-        verbose_name="Statut"
-    )
-    
-    # Métadonnées
-    created_at = models.DateTimeField(auto_now_add=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
-    
-    class Meta:
-        verbose_name = "Simulation"
-        verbose_name_plural = "Simulations"
-        ordering = ['-created_at']
-    
-    def __str__(self):
-        return f"Simulation {self.id} - {self.installation.nom} ({self.status})"
-    
-    @property
-    def economie_annuelle_estimee(self):
-        """
-        Économie annuelle estimée (simplifiée).
-        Tarif moyen : 0.2276 €/kWh
-        """
-        tarif_moyen = 0.2276
-        economie = (
-            self.autoconsommation_kwh * tarif_moyen +
-            self.injection_reseau_kwh * 0.13  # Tarif vente surplus
-        )
-        return round(economie, 2)
+    # RÃ©sultats de production
