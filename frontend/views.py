@@ -124,18 +124,8 @@ class SimulationFormView(CreateView):
                 # Stocker le profil_id en session pour le lier plus tard
                 self.request.session['consumption_profile_id'] = profil_id
                 
-                # Message informatif
-                import json
-                if profil.appareils_json:
-                    try:
-                        appareils = json.loads(profil.appareils_json)
-                        nb_appareils = len(appareils.get('appareils', {}))
-                        messages.info(
-                            self.request,
-                            f"📊 Simulation basée sur votre profil '{profil.nom}' avec {nb_appareils} appareils programmables"
-                        )
-                    except:
-                        pass
+                # Log uniquement (pas de bandeau utilisateur)
+                logger.info(f"📊 Profil '{profil.nom}' chargé pour la simulation")
                 
                 return initial
                 
@@ -182,7 +172,7 @@ class SimulationFormView(CreateView):
             # 🆕 CHARGER LA CONSOMMATION DU PROFIL
             try:
                 profil = ConsumptionProfileModel.objects.get(id=profil_id)
-                context['consommation_from_profil'] = profil.consommation_annuelle_kwh or 5000
+                context['consommation_from_profil'] = int(profil.consommation_annuelle_kwh or 5000)
                 logger.info(f"🔄 Mode restauration activé - consommation: {context['consommation_from_profil']} kWh")
             except ConsumptionProfileModel.DoesNotExist:
                 context['consommation_from_profil'] = 5000
@@ -196,6 +186,12 @@ class SimulationFormView(CreateView):
             # Nettoyer la session APRÈS avoir passé au template
             del self.request.session['prefill_from_consumption']
         
+        # Flag JS : un profil de consommation existe-t-il en session ?
+        context['has_consumption_profile'] = bool(
+            self.request.session.get('consumption_profile_id')
+            or (restore and profil_id)
+        )
+        
         return context
     
     def form_valid(self, form):
@@ -203,42 +199,52 @@ class SimulationFormView(CreateView):
         Appelé si le formulaire est valide.
         Crée l'installation et lance la simulation.
         """
+        print("✅✅✅ FORM_VALID APPELÉ - Le formulaire est valide !", flush=True)
+        logger.info("✅✅✅ FORM_VALID APPELÉ")
         try:
             installation = form.save(commit=False)  
             installation.user = self.request.user if self.request.user.is_authenticated else None
 
 
-            # Validation et lien OBLIGATOIRE du profil 
+            # Lier le profil de consommation (si disponible)
             consumption_profile_id = self.request.session.get('consumption_profile_id')
-                        
-            if not consumption_profile_id:
-                logger.error("❌ Aucun profil de consommation trouvé en session")
-                messages.error(
-                    self.request,
-                    "❌ Erreur : Profil de consommation manquant. "
-                    "Veuillez compléter le formulaire de consommation."
-                )
-                return redirect('frontend:configure_consumption')
 
-            # Récupérer et lier le profil
-            try:
-                profil = ConsumptionProfileModel.objects.get(id=consumption_profile_id)
-                
-                # ✅ LIEN DIRECT via ForeignKey (au lieu de copier les données)
-                installation.consumption_profile = profil
-                
-                logger.info(f"✅ Profil '{profil.nom}' (ID: {consumption_profile_id}) lié à l'installation")
-                
-                # Nettoyer la session
-                del self.request.session['consumption_profile_id']
-                
-            except ConsumptionProfileModel.DoesNotExist:
-                logger.error(f"❌ Profil {consumption_profile_id} introuvable en base")
-                messages.error(
-                    self.request,
-                    "❌ Erreur : Profil de consommation introuvable. Veuillez réessayer."
+            if consumption_profile_id:
+                # Cas 1 : Profil créé via configure_consumption
+                try:
+                    profil = ConsumptionProfileModel.objects.get(id=consumption_profile_id)
+                    installation.consumption_profile = profil
+                    logger.info(f"✅ Profil '{profil.nom}' (ID: {consumption_profile_id}) lié à l'installation")
+                    del self.request.session['consumption_profile_id']
+                except ConsumptionProfileModel.DoesNotExist:
+                    logger.warning(f"⚠️ Profil {consumption_profile_id} introuvable en base")
+            else:
+                # Cas 2 : Consommation saisie manuellement ou via calculateur
+                # → Créer un profil minimal à partir des données du formulaire
+                consommation_value = (
+                    self.request.POST.get('consommation_finale')
+                    or self.request.POST.get('consommation_annuelle')
+                    or 5000
                 )
-                return redirect('frontend:configure_consumption')
+                try:
+                    # Estimation surface basée sur la consommation (~50 kWh/m²/an pour un logement moyen)
+                    conso_float = float(consommation_value)
+                    surface_estimee = max(30.0, min(300.0, conso_float / 50.0))
+                    
+                    profil = ConsumptionProfileModel.objects.create(
+                        user=self.request.user if self.request.user.is_authenticated else None,
+                        nom="Maison type",
+                        consommation_annuelle_kwh=conso_float,
+                        surface_habitable=surface_estimee,
+                        nb_personnes=int(self.request.POST.get('nb_personnes', 2)),
+                        profile_type='actif_absent',
+                        type_chauffage='non_electrique',
+                        type_ecs='electrique',
+                    )
+                    installation.consumption_profile = profil
+                    logger.info(f"✅ Profil auto-généré: {conso_float:.0f} kWh/an, {surface_estimee:.0f} m²")
+                except Exception as e:
+                    logger.error(f"❌ Impossible de créer un profil auto: {e}", exc_info=True)
 
             # Lier à la consommation source si elle existe
             consommation_source_id = self.request.session.get('consommation_source_id')
@@ -272,7 +278,7 @@ class SimulationFormView(CreateView):
                 })
             
             # Pour les requêtes classiques, rediriger
-            messages.success(self.request, 'Simulation lancée !')
+            # Message supprimé - la redirection vers progression suffit
             return redirect('frontend:simulation_progress', simulation_id=simulation.id)
         
         except Exception as e:
@@ -282,20 +288,32 @@ class SimulationFormView(CreateView):
     
     def form_invalid(self, form):
         """Retourner les erreurs du formulaire"""
+        import sys
         errors = {field: str(error[0]) for field, error in form.errors.items()}
         
-        # ===== DEBUG : AFFICHER LES ERREURS =====
-        print("\n" + "="*60)
-        print("❌ FORMULAIRE INVALIDE !")
-        print("="*60)
-        print("📝 DONNÉES REÇUES :")
+        # ===== DEBUG VISIBLE DANS LE NAVIGATEUR =====
+        error_details = " | ".join([f"{field}: {err}" for field, err in errors.items()])
+        messages.error(
+            self.request,
+            f"❌ FORMULAIRE INVALIDE — Champs en erreur : {error_details}"
+        )
+        
+        # ===== DEBUG TERMINAL (avec flush) =====
+        print("\n" + "="*60, flush=True)
+        print("❌ FORMULAIRE INVALIDE !", flush=True)
+        print("="*60, flush=True)
+        print("📝 DONNÉES REÇUES :", flush=True)
         for key, value in self.request.POST.items():
             if key != 'csrfmiddlewaretoken':
-                print(f"   {key} = {value}")
-        print("\n🚫 ERREURS DE VALIDATION :")
+                print(f"   {key} = '{value}'", flush=True)
+        print("\n🚫 ERREURS DE VALIDATION :", flush=True)
         for field, error in errors.items():
-            print(f"   {field}: {error}")
-        print("="*60 + "\n")
+            print(f"   {field}: {error}", flush=True)
+        print("="*60 + "\n", flush=True)
+        sys.stdout.flush()
+        sys.stderr.flush()
+        logger.error(f"❌ FORM INVALID: {errors}")
+        logger.error(f"📝 POST DATA: {dict(self.request.POST)}")
         # ===== FIN DEBUG =====
         
         # Pour les requêtes AJAX
@@ -1817,19 +1835,8 @@ def configure_consumption(request):
                 # ✅ CRUCIAL : Stocker en session AVANT de rediriger
                 request.session['consumption_profile_id'] = profil.id
                 
-                # Compter les appareils
-                import json
-                try:
-                    appareils = json.loads(profil.appareils_json)
-                    nb_appareils = len(appareils.get('appareils', {}))
-                except:
-                    nb_appareils = 0
-                
-                # Message de succès
-                messages.success(
-                    request,
-                    f"✅ Profil '{profil.nom}' créé avec succès ! {nb_appareils} appareils programmables identifiés."
-                )
+                # Log uniquement (pas de bandeau utilisateur)
+                logger.info(f"✅ Profil '{profil.nom}' créé avec succès")
                 
                 # VÉRIFIER SI ON DOIT REVENIR À LA SIMULATION
                 return_to = request.GET.get('return')
@@ -1852,6 +1859,12 @@ def configure_consumption(request):
                 request,
                 "❌ Erreur dans le formulaire. Veuillez corriger les erreurs."
             )
+            # Re-render le formulaire avec les erreurs
+            context = {
+                'form': form,
+                'page_title': 'Configuration de votre profil de consommation'
+            }
+            return render(request, 'frontend/configure_consumption.html', context)
     
     else:
         # GET : Formulaire vide ou pré-rempli

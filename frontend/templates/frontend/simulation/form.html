@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load l10n %}
 
 {% block title %}Simulation Solaire - Solar Simulator{% endblock %}
 
@@ -104,6 +105,31 @@
         <form id="simulation-form" method="post" action="{% url 'frontend:simulation_create' %}" class="max-w-5xl mx-auto">
             {% csrf_token %}
             
+            <!-- ===== AFFICHAGE DES ERREURS DE VALIDATION ===== -->
+            {% if form.errors %}
+            <div style="background:#fef2f2; border:3px solid #ef4444; color:#991b1b; padding:1.5rem; border-radius:0.75rem; margin-bottom:2rem; font-size:1rem;">
+                <h3 style="font-size:1.25rem; font-weight:bold; margin-bottom:0.75rem;">⚠️ Le formulaire contient des erreurs :</h3>
+                <ul style="list-style:disc; padding-left:1.5rem;">
+                {% for field, errors in form.errors.items %}
+                    <li><strong>{{ field }}</strong> : {{ errors.0 }}</li>
+                {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if messages %}
+            <div style="margin-bottom:2rem;">
+                {% for message in messages %}
+                <div style="padding:1rem; border-radius:0.5rem; margin-bottom:0.5rem;
+                    {% if message.tags == 'error' %}background:#fef2f2; border:2px solid #ef4444; color:#991b1b;
+                    {% elif message.tags == 'success' %}background:#f0fdf4; border:2px solid #10b981; color:#065f46;
+                    {% else %}background:#eff6ff; border:2px solid #3b82f6; color:#1e40af;{% endif %}">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            
             <!-- ========== ÉTAPE 1 : LOCALISATION ========== -->
             <div class="form-section" id="section-1">
                 <h2 class="text-2xl font-bold mb-6 flex items-center">
@@ -189,16 +215,29 @@
                                     <input type="number" id="consommation_annuelle" name="consommation_annuelle"
                                            class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
                                            placeholder="Ex: 5000" min="1000" max="50000">
-                                    <div class="mt-3 text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
-                                        <p class="text-sm text-blue-800 mb-2">
-                                            💡 Besoin d'une estimation plus précise avec vos appareils ?
+                                    <p class="text-xs text-gray-500 mt-1">kWh/an (voir sur votre facture EDF)</p>
+                                    
+                                    <!-- Profil obligatoire -->
+                                    <div id="profile-required-box" class="mt-3 p-4 bg-amber-50 rounded-lg border-2 border-amber-400">
+                                        <p class="text-sm text-amber-900 mb-3 font-semibold">
+                                            ⚠️ Un profil de consommation est nécessaire pour lancer la simulation
+                                        </p>
+                                        <p class="text-xs text-amber-700 mb-3">
+                                            Quelques questions rapides sur votre logement et vos appareils pour personnaliser les résultats.
                                         </p>
                                         <a href="#" id="detailed-consumption-link" 
-                                        class="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-semibold">
-                                            📋 Remplir le formulaire détaillé (2 min)
+                                           class="inline-flex items-center justify-center w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition text-sm font-bold">
+                                            <i class="fas fa-clipboard-list mr-2"></i>
+                                            Créer mon profil de consommation (2 min)
                                         </a>
                                     </div>
-                                    <p class="text-xs text-gray-500 mt-1">kWh/an (voir sur votre facture EDF)</p>
+                                    
+                                    <!-- Confirmation quand profil créé -->
+                                    <div id="profile-created-box" class="mt-3 p-4 bg-green-50 rounded-lg border-2 border-green-400 hidden">
+                                        <p class="text-sm text-green-800 font-semibold">
+                                            ✅ Profil de consommation créé — Vous pouvez continuer
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         </label>
@@ -363,36 +402,21 @@
             <div class="form-section hidden" id="section-4">
                 <h2 class="text-2xl font-bold mb-6 flex items-center">
                     <span class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white mr-3">4</span>
-                    ⚙️ Configuration optimisée pour vous
+                    ⚙️ Configuration de votre installation
                 </h2>
                 
-                <!-- Résultats du calcul -->
+                <!-- Puissance recommandée -->
                 <div class="config-result mb-6">
                     <h3 class="text-2xl font-bold mb-4 text-center">💡 Puissance recommandée</h3>
                     <div class="text-center mb-4">
                         <div class="text-6xl font-bold" id="puissance-recommandee">--.-- kWc</div>
-                    </div>
-                    
-                    <div class="grid md:grid-cols-3 gap-4">
-                        <div class="config-metric">
-                            <div class="text-sm opacity-90">Production estimée</div>
-                            <div class="text-2xl font-bold" id="production-estimee">--</div>
-                            <div class="text-xs">kWh/an</div>
-                        </div>
-                        <div class="config-metric">
-                            <div class="text-sm opacity-90">Autoconsommation</div>
-                            <div class="text-2xl font-bold" id="taux-autoconso">--</div>
-                            <div class="text-xs">%</div>
-                        </div>
-                        <div class="config-metric">
-                            <div class="text-sm opacity-90">Économies annuelles</div>
-                            <div class="text-2xl font-bold" id="economies-annuelles">--</div>
-                            <div class="text-xs">€/an</div>
-                        </div>
+                        <p class="text-sm text-gray-200 mt-2">
+                            soit environ <span id="nb-panneaux">--</span> panneaux de 400 Wc
+                        </p>
                     </div>
                     
                     <div class="mt-4 p-4 bg-white bg-opacity-20 rounded-lg">
-                        <p class="text-sm" id="explication-config">--</p>
+                        <p class="text-sm leading-relaxed" id="explication-config">--</p>
                     </div>
                 </div>
                 
@@ -420,9 +444,11 @@
                                 <option value="SE">Sud-Est</option>
                                 <option value="SW">Sud-Ouest</option>
                                 <option value="E">Est</option>
+                                <option value="EW">Est/Ouest (réparti)</option>
                                 <option value="W">Ouest</option>
                                 <option value="N">Nord</option>
                             </select>
+                            <p class="text-xs text-gray-500 mt-1">Est/Ouest : panneaux répartis de chaque côté</p>
                         </div>
                         
                         <!-- Inclinaison -->
@@ -430,7 +456,7 @@
                             <label class="block text-sm font-semibold mb-2">Inclinaison</label>
                             <input type="number" name="inclinaison" id="id_inclinaison" value="30" min="0" max="90"
                                    class="w-full px-4 py-3 rounded-lg border border-gray-300">
-                            <p class="text-xs text-gray-500 mt-1">degrés (30° optimal)</p>
+                            <p class="text-xs text-gray-500 mt-1">degrés (30° optimal en France)</p>
                         </div>
                     </div>
                     
@@ -478,11 +504,19 @@
     let currentStep = 1;
     let map, marker;
     let consoData = null;
+    let hasConsumptionProfile = false;  // Flag: un profil a-t-il été créé ?
     
     // Données de pré-remplissage depuis consommation
     {% if prefill_data %}
     consoData = {{ prefill_data|safe }};
+    hasConsumptionProfile = true;
     console.log('✅ Données de pré-remplissage chargées:', consoData);
+    {% endif %}
+    
+    // Profil existant en session ?
+    {% if has_consumption_profile %}
+    hasConsumptionProfile = true;
+    console.log('✅ Profil de consommation existant détecté');
     {% endif %}
     
     // ===== NAVIGATION ENTRE ÉTAPES =====
@@ -495,7 +529,7 @@
             }
         }
         
-        // Validation étape 2
+        // Validation étape 2 — un profil de consommation est OBLIGATOIRE
         if (currentStep === 2) {
             const option = document.querySelector('input[name="conso_option"]:checked');
             if (!option) {
@@ -503,21 +537,35 @@
                 return;
             }
             
-            // Vérification selon l'option choisie
-            if (option.value === 'manuelle') {
+            if (option.value === 'analysee') {
+                if (!consoData || !consoData.consommation_annuelle) {
+                    alert('⚠️ Données de consommation non trouvées. Veuillez créer votre profil.');
+                    return;
+                }
+                if (!hasConsumptionProfile) {
+                    alert('⚠️ Veuillez d\'abord créer votre profil de consommation.');
+                    return;
+                }
+                document.getElementById('consommation_finale').value = consoData.consommation_annuelle;
+                
+            } else if (option.value === 'manuelle') {
+                // Option manuelle : le profil doit avoir été créé via le formulaire
+                if (!hasConsumptionProfile) {
+                    alert('⚠️ Pour continuer, veuillez créer votre profil de consommation en cliquant sur le bouton ci-dessus.');
+                    // Highlight le bouton
+                    const link = document.getElementById('detailed-consumption-link');
+                    if (link) {
+                        link.classList.add('animate-pulse', 'ring-4', 'ring-amber-400');
+                        link.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                    return;
+                }
                 const input = document.getElementById('consommation_annuelle');
                 if (!input || !input.value || input.value < 1000) {
                     alert('⚠️ Veuillez saisir votre consommation (≥ 1000 kWh/an)');
                     return;
                 }
                 document.getElementById('consommation_finale').value = input.value;
-                
-            } else if (option.value === 'analysee') {
-                if (!consoData || !consoData.consommation_annuelle) {
-                    alert('⚠️ Données de consommation non trouvées');
-                    return;
-                }
-                document.getElementById('consommation_finale').value = consoData.consommation_annuelle;
             }
             
             console.log('✅ Consommation validée:', document.getElementById('consommation_finale').value, 'kWh/an');
@@ -756,14 +804,12 @@
         })
         .then(response => response.json())
         .then(data => {
-            // Afficher résultats
+            // Afficher puissance recommandée + explication
             document.getElementById('puissance-recommandee').textContent = data.puissance_kw + ' kWc';
-            document.getElementById('production-estimee').textContent = data.production_kwh.toFixed(0);
-            document.getElementById('taux-autoconso').textContent = data.taux_autoconso.toFixed(1);
-            document.getElementById('economies-annuelles').textContent = data.economie_annuelle.toFixed(0);
+            document.getElementById('nb-panneaux').textContent = Math.ceil(data.puissance_kw / 0.4);
             document.getElementById('explication-config').textContent = data.explication;
             
-            // Pré-remplir formulaire
+            // Pré-remplir formulaire technique
             document.getElementById('puissance_kw').value = data.puissance_kw;
             document.getElementById('id_orientation').value = data.orientation_optimale || 'S';
             document.getElementById('id_inclinaison').value = data.inclinaison_optimale || 30;
@@ -840,10 +886,11 @@ document.addEventListener('DOMContentLoaded', function() {
 {% if restore_mode %}
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🔄 Mode restauration activé');
+    hasConsumptionProfile = true;  // Un profil existe puisqu'on revient du formulaire
     
     // 🆕 REMPLIR LE CHAMP CONSOMMATION DEPUIS LE PROFIL
     {% if consommation_from_profil %}
-    const consoValue = {{ consommation_from_profil }};
+    var consoValue = parseInt("{{ consommation_from_profil|stringformat:'d' }}");
     document.getElementById('consommation_finale').value = consoValue;
     console.log('✅ Consommation pré-remplie: ' + consoValue + ' kWh');
     {% endif %}
@@ -904,8 +951,8 @@ document.addEventListener('DOMContentLoaded', function() {
             radioAnalysee.checked = true;
             document.getElementById('conso-analysee-details')?.classList.remove('hidden');
             const consoValueDisplay = document.getElementById('conso-value');
-            if (consoValueDisplay) {
-                consoValueDisplay.textContent = {{ consommation_from_profil }};
+            if (consoValueDisplay && consoValue) {
+                consoValueDisplay.textContent = consoValue;
             }
         }
         
@@ -913,6 +960,12 @@ document.addEventListener('DOMContentLoaded', function() {
         currentStep = 3;
         document.getElementById('section-3').classList.remove('hidden');
         document.getElementById('step-3').classList.add('active');
+        
+        // Montrer la confirmation de profil créé
+        const requiredBox = document.getElementById('profile-required-box');
+        const createdBox = document.getElementById('profile-created-box');
+        if (requiredBox) requiredBox.classList.add('hidden');
+        if (createdBox) createdBox.classList.remove('hidden');
         
         console.log('✅ Étape 3 affichée - Prêt à choisir un objectif');
         window.scrollTo({ top: 0, behavior: 'smooth' });

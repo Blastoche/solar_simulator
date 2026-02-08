@@ -15,6 +15,7 @@ class Installation(models.Model):
         ('S', 'Sud'),
         ('SW', 'Sud-Ouest'),
         ('W', 'Ouest'),
+        ('EW', 'Est/Ouest (réparti)'),
         ('NW', 'Nord-Ouest'),
     ]
     
