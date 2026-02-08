@@ -39,6 +39,8 @@ urlpatterns = [
     # 🆕 Health check (pour monitoring/devops)
     # GET /health/ → {'status': 'ok'}
     path('health/', lambda r: JsonResponse({'status': 'ok'})),
+
+    path('reporting/', include('reporting.urls')),
 ]
 
 # 🆕 En développement, servir les fichiers uploadés
