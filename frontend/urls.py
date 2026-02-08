@@ -77,4 +77,12 @@ urlpatterns = [
     path('consommation/<int:consommation_id>/export-pdf/', 
          views.export_pdf_expert, 
          name='export_pdf_expert'),
+
+     # Pages légales
+    path('mentions-legales/', views.MentionsLegalesView.as_view(), name='mentions'),
+    path('politique-confidentialite/', views.PrivacyView.as_view(), name='privacy'),
+    path('cgv/', views.CGVView.as_view(), name='cgv'),
+
+     # Configuration consommation
+    path('consumption/configure/', views.configure_consumption, name='configure_consumption'),
 ]

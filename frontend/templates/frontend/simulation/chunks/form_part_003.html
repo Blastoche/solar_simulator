@@ -1,0 +1,200 @@
+﻿                    <h3 class="font-bold mb-4">âš™ï¸ ParamÃ¨tres techniques</h3>
+                    
+                    <div class="grid md:grid-cols-3 gap-4">
+                        <!-- Puissance -->
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">
+                                Puissance <span id="lock-icon">ðŸ”’</span>
+                            </label>
+                            <input type="number" name="puissance_kw" id="puissance_kw" step="0.5" min="1" max="36"
+                                   class="w-full px-4 py-3 rounded-lg border border-gray-300" readonly>
+                            <p class="text-xs text-gray-500 mt-1">kWc (kilowatt-crÃªte)</p>
+                        </div>
+                        
+                        <!-- Orientation -->
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Orientation</label>
+                            <select name="orientation" id="id_orientation" 
+                                    class="w-full px-4 py-3 rounded-lg border border-gray-300">
+                                <option value="S" selected>Sud (optimal)</option>
+                                <option value="SE">Sud-Est</option>
+                                <option value="SW">Sud-Ouest</option>
+                                <option value="E">Est</option>
+                                <option value="W">Ouest</option>
+                                <option value="N">Nord</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Inclinaison -->
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Inclinaison</label>
+                            <input type="number" name="inclinaison" id="id_inclinaison" value="30" min="0" max="90"
+                                   class="w-full px-4 py-3 rounded-lg border border-gray-300">
+                            <p class="text-xs text-gray-500 mt-1">degrÃ©s (30Â° optimal)</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Toggle personnalisation -->
+                    <div class="mt-4">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="toggle-perso" onchange="togglePersonnalisation()" class="mr-3">
+                            <span class="text-sm">ðŸŽ›ï¸ Je veux personnaliser la puissance</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Type toiture -->
+                <div class="mb-6">
+                    <label class="block text-sm font-semibold mb-2">Type de toiture</label>
+                    <select name="type_toiture" id="id_type_toiture" 
+                            class="w-full px-4 py-3 rounded-lg border border-gray-300">
+                        <option value="tuiles">Tuiles</option>
+                        <option value="ardoise">Ardoise</option>
+                        <option value="zinc">Zinc</option>
+                        <option value="beton">BÃ©ton</option>
+                        <option value="tole">TÃ´le</option>
+                    </select>
+                </div>
+                
+                <!-- Soumission -->
+                <div class="flex gap-4">
+                    <button type="button" onclick="prevStep(3)" 
+                            class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
+                        <i class="fas fa-arrow-left mr-2"></i> Retour
+                    </button>
+                    <button type="submit" id="submit-button"
+                            class="flex-1 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:shadow-lg transition text-lg font-bold">
+                        ðŸš€ Lancer la simulation dÃ©taillÃ©e
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // ===== VARIABLES GLOBALES =====
+    let currentStep = 1;
+    let map, marker;
+    let consoData = null;
+    
+    // DonnÃ©es de prÃ©-remplissage depuis consommation
+    {% if prefill_data %}
+    consoData = {{ prefill_data|safe }};
+    console.log('âœ… DonnÃ©es de prÃ©-remplissage chargÃ©es:', consoData);
+    {% endif %}
+    
+    // ===== NAVIGATION ENTRE Ã‰TAPES =====
+    function nextStep(step) {
+        // Validation Ã©tape 1
+        if (currentStep === 1) {
+            if (!document.getElementById('latitude-input').value) {
+                alert('âš ï¸ Veuillez sÃ©lectionner une localisation');
+                return;
+            }
+        }
+        
+        // Validation Ã©tape 2
+        if (currentStep === 2) {
+            const option = document.querySelector('input[name="conso_option"]:checked');
+            if (!option) {
+                alert('âš ï¸ Veuillez sÃ©lectionner une option de consommation');
+                return;
+            }
+            
+            // VÃ©rification selon l'option choisie
+            if (option.value === 'manuelle') {
+                const input = document.getElementById('consommation_annuelle');
+                if (!input || !input.value || input.value < 1000) {
+                    alert('âš ï¸ Veuillez saisir votre consommation (â‰¥ 1000 kWh/an)');
+                    return;
+                }
+                document.getElementById('consommation_finale').value = input.value;
+                
+            } else if (option.value === 'analysee') {
+                if (!consoData || !consoData.consommation_annuelle) {
+                    alert('âš ï¸ DonnÃ©es de consommation non trouvÃ©es');
+                    return;
+                }
+                document.getElementById('consommation_finale').value = consoData.consommation_annuelle;
+            }
+            
+            console.log('âœ… Consommation validÃ©e:', document.getElementById('consommation_finale').value, 'kWh/an');
+        }
+        
+        // Validation Ã©tape 3
+        if (currentStep === 3) {
+            if (!document.getElementById('objectif_choisi').value) {
+                alert('âš ï¸ Veuillez choisir un objectif');
+                return;
+            }
+        }
+        
+        // Masquer Ã©tape actuelle
+        document.getElementById(`section-${currentStep}`).classList.add('hidden');
+        document.getElementById(`step-${currentStep}`).classList.remove('active');
+        document.getElementById(`step-${currentStep}`).classList.add('completed');
+        
+        // Afficher nouvelle Ã©tape
+        currentStep = step;
+        document.getElementById(`section-${currentStep}`).classList.remove('hidden');
+        document.getElementById(`step-${currentStep}`).classList.add('active');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    
+    function prevStep(step) {
+        document.getElementById(`section-${currentStep}`).classList.add('hidden');
+        document.getElementById(`step-${currentStep}`).classList.remove('active');
+        
+        currentStep = step;
+        document.getElementById(`section-${step}`).classList.remove('hidden');
+        document.getElementById(`step-${step}`).classList.add('active');
+        document.getElementById(`step-${step}`).classList.remove('completed');
+        
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    
+    // ===== INITIALISATION CARTE LEAFLET =====
+    map = L.map('map').setView([46.603354, 1.888334], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: 'Â© OpenStreetMap contributors',
+        maxZoom: 19
+    }).addTo(map);
+    
+    const customIcon = L.icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    });
+    
+    map.on('click', function(e) {
+        const lat = e.latlng.lat.toFixed(6);
+        const lon = e.latlng.lng.toFixed(6);
+        updateLocation(lat, lon);
+        if (marker) {
+            marker.setLatLng(e.latlng);
+        } else {
+            marker = L.marker(e.latlng, { icon: customIcon }).addTo(map);
+        }
+    });
+    
+    function updateLocation(lat, lon, address = '') {
+        document.getElementById('latitude-input').value = lat;
+        document.getElementById('longitude-input').value = lon;
+        document.getElementById('display-lat').textContent = lat + 'Â°';
+        document.getElementById('display-lon').textContent = lon + 'Â°';
+        if (address) document.getElementById('adresse-input').value = address;
+    }
+    
+    // ===== AUTOCOMPLETE ADRESSE =====
+    let searchTimeout;
+    const addressInput = document.getElementById('adresse-input');
+    const suggestionsDiv = document.getElementById('address-suggestions');
+
+    addressInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        const query = this.value.trim();

@@ -40,6 +40,38 @@ class Installation(models.Model):
     inclinaison = models.IntegerField(help_text="Angle en degrés")
     type_toiture = models.CharField(max_length=50, choices=ROOF_TYPE_CHOICES)
     
+    # === NOUVEAU : Profil de consommation personnalisé ===
+    consommation_annuelle = models.FloatField(
+        null=True, 
+        blank=True,
+        verbose_name="Consommation annuelle (kWh)",
+        help_text="Consommation électrique annuelle du foyer"
+    )
+    
+    profile_type = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        verbose_name="Type de profil d'occupation",
+        help_text="actif_absent, teletravail, retraite, famille"
+    )
+    
+    appareils_json = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name="Configuration des appareils (JSON)",
+        help_text="Stockage JSON des appareils programmables et leurs horaires"
+    )
+
+    consumption_profile = models.ForeignKey(
+            'solar_calc.ConsumptionProfileModel',
+            on_delete=models.SET_NULL,
+            null=True,
+            blank=True,
+            related_name='installations',
+            verbose_name="Profil de consommation détaillé"
+        )
+
     # Lien avec l'analyse de consommation (optionnel)
     consommation_source = models.ForeignKey(
         'ConsommationCalculee',
@@ -59,7 +91,6 @@ class Installation(models.Model):
     
     class Meta:
         ordering = ['-created_at']
-
 
 class Simulation(models.Model):
     """Représente une simulation de production solaire"""
@@ -133,6 +164,73 @@ class Resultat(models.Model):
     
     class Meta:
         ordering = ['-created_at']
+
+    # NOUVEAUX CHAMPS
+    taux_autoproduction_pct = models.FloatField(
+        default=0,
+        help_text="Part de la consommation couverte par la production"
+    )
+    puissance_recommandee_kwc = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Puissance optimale recommandée"
+    )
+    objectif_optimisation = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        choices=[
+            ('rentabilite', 'Rentabilité'),
+            ('autonomie', 'Autonomie'),
+            ('equilibre', 'Équilibre')
+        ]
+    )
+
+    # ========== SCÉNARIO ACTUEL (horaires habituels) ==========
+    autoconsommation_kwh_actuel = models.FloatField(
+        null=True, blank=True,
+        verbose_name="Autoconsommation scénario actuel (kWh)"
+    )
+    autoconsommation_ratio_actuel = models.FloatField(
+        null=True, blank=True,
+        verbose_name="Taux autoconsommation actuel (%)"
+    )
+    economie_annuelle_actuel = models.FloatField(
+        null=True, blank=True,
+        verbose_name="Économie annuelle actuel (€)"
+    )
+    
+    # ========== SCÉNARIO OPTIMISÉ (heures solaires) ==========
+    autoconsommation_kwh_optimise = models.FloatField(
+        null=True, blank=True,
+        verbose_name="Autoconsommation scénario optimisé (kWh)"
+    )
+    autoconsommation_ratio_optimise = models.FloatField(
+        null=True, blank=True,
+        verbose_name="Taux autoconsommation optimisé (%)"
+    )
+    economie_annuelle_optimise = models.FloatField(
+        null=True, blank=True,
+        verbose_name="Économie annuelle optimisé (€)"
+    )
+    
+    # ========== GAIN POTENTIEL ==========
+    gain_autoconso_kwh = models.FloatField(
+        null=True, blank=True,
+        verbose_name="Gain autoconsommation (kWh)"
+    )
+    gain_autoconso_pct = models.FloatField(
+        null=True, blank=True,
+        verbose_name="Gain autoconsommation (%)"
+    )
+    gain_economie_annuel = models.FloatField(
+        null=True, blank=True,
+        verbose_name="Gain économique annuel (€)"
+    )
+    gain_economie_25ans = models.FloatField(
+        null=True, blank=True,
+        verbose_name="Gain économique sur 25 ans (€)"
+    )
 
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator

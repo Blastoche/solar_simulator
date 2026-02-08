@@ -1,0 +1,200 @@
+﻿                                    <p class="text-xs text-gray-500 mt-1">kWh/an (voir sur votre facture EDF)</p>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                    
+                    <!-- Option C : Calculateur -->
+                    <div class="border-2 border-gray-200 rounded-lg p-4 hover:border-blue-500 transition">
+                        <div class="flex items-start">
+                            <div class="flex-1">
+                                <div class="font-semibold text-lg">â“ Je ne connais pas ma consommation</div>
+                                <p class="text-sm text-gray-600 mt-1">Choisissez votre calculateur</p>
+                                
+                                <!-- ===== 2 OPTIONS ===== -->
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    <!-- Option Rapide -->
+                                    <a href="{% url 'frontend:consumption_calculator' %}" target="_blank"
+                                       class="inline-flex items-center px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition">
+                                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                                        </svg>
+                                        âš¡ Rapide (2 min)
+                                    </a>
+                                    
+                                    <!-- Option Expert -->
+                                    <a href="{% url 'frontend:consumption_calculator_expert' %}" target="_blank"
+                                       class="inline-flex items-center px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition">
+                                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                                            <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+                                        </svg>
+                                        ðŸŽ¯ Expert (5 min)
+                                    </a>
+                                </div>
+                                
+                                <p class="text-xs text-gray-500 mt-2">
+                                    ðŸ’¡ <strong>Rapide :</strong> Estimation rapide | <strong>Expert :</strong> Analyse dÃ©taillÃ©e par appareil
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Champ cachÃ© pour stocker la consommation -->
+                <input type="hidden" id="consommation_finale" name="consommation_finale" value="">
+                
+                <!-- Boutons de navigation -->
+                <div class="mt-8">
+                    <button type="button" onclick="nextStep(3)" 
+                            class="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition transform hover:scale-105 font-semibold text-lg">
+                        Continuer vers l'objectif <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+                
+                <div class="mt-4 text-center">
+                    <button type="button" onclick="prevStep(1)" 
+                            class="text-gray-600 hover:text-gray-800 font-semibold">
+                        <i class="fas fa-arrow-left mr-2"></i> Retour Ã  la localisation
+                    </button>
+                </div>
+            </div>
+            
+            <!-- ========== Ã‰TAPE 3 : OBJECTIF ========== -->
+            <div class="form-section hidden" id="section-3">
+                <h2 class="text-2xl font-bold mb-6 flex items-center">
+                    <span class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white mr-3">3</span>
+                    ðŸŽ¯ Quel est votre objectif principal ?
+                </h2>
+                
+                <div class="grid md:grid-cols-2 gap-4 mb-6">
+                    <!-- RentabilitÃ© -->
+                    <div class="objectif-card" onclick="selectObjectif('rentabilite')" id="obj-rentabilite">
+                        <div class="objectif-icon bg-yellow-100">ðŸ’°</div>
+                        <h3 class="text-xl font-bold text-center mb-2">RENTABILITÃ‰</h3>
+                        <p class="text-center text-sm text-gray-600 mb-3">ROI optimal (8-10 ans)</p>
+                        <ul class="text-sm space-y-1">
+                            <li>âœ“ Taux d'autoconso : ~70%</li>
+                            <li>âœ“ Retour sur investissement rapide</li>
+                            <li>âœ“ Configuration Ã©quilibrÃ©e</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Autonomie -->
+                    <div class="objectif-card" onclick="selectObjectif('autonomie')" id="obj-autonomie">
+                        <div class="objectif-icon bg-blue-100">âš¡</div>
+                        <h3 class="text-xl font-bold text-center mb-2">AUTONOMIE</h3>
+                        <p class="text-center text-sm text-gray-600 mb-3">IndÃ©pendance maximale</p>
+                        <ul class="text-sm space-y-1">
+                            <li>âœ“ Taux d'autoconso : ~95%</li>
+                            <li>âœ“ Couverture complÃ¨te des besoins</li>
+                            <li>âœ“ Minimum de rÃ©seau</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Ã‰quilibre -->
+                    <div class="objectif-card" onclick="selectObjectif('equilibre')" id="obj-equilibre">
+                        <div class="objectif-icon bg-purple-100">âš–ï¸</div>
+                        <h3 class="text-xl font-bold text-center mb-2">Ã‰QUILIBRE</h3>
+                        <p class="text-center text-sm text-gray-600 mb-3">Meilleur compromis</p>
+                        <ul class="text-sm space-y-1">
+                            <li>âœ“ Taux d'autoconso : ~85%</li>
+                            <li>âœ“ Bon ROI + bonne autonomie</li>
+                            <li>âœ“ RecommandÃ© pour la plupart</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Ã‰cologie -->
+                    <div class="objectif-card" onclick="selectObjectif('ecologie')" id="obj-ecologie">
+                        <div class="objectif-icon bg-green-100">ðŸŒ</div>
+                        <h3 class="text-xl font-bold text-center mb-2">Ã‰COLOGIE</h3>
+                        <p class="text-center text-sm text-gray-600 mb-3">Production maximale</p>
+                        <ul class="text-sm space-y-1">
+                            <li>âœ“ Production d'Ã©nergie verte max</li>
+                            <li>âœ“ Impact carbone rÃ©duit</li>
+                            <li>âœ“ Contribution au rÃ©seau</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Revente -->
+                    <div class="objectif-card col-span-2" onclick="selectObjectif('revente')" id="obj-revente">
+                        <div class="objectif-icon bg-red-100">ðŸ’¸</div>
+                        <h3 class="text-xl font-bold text-center mb-2">REVENTE TOTALE</h3>
+                        <p class="text-center text-sm text-gray-600 mb-3">Revenus garantis 20 ans</p>
+                        <div class="grid md:grid-cols-2 gap-4 text-sm mt-3">
+                            <ul class="space-y-1">
+                                <li>âœ“ Vente 100% Ã  EDF OA</li>
+                                <li>âœ“ Tarif garanti par l'Ã‰tat</li>
+                                <li>âœ“ Revenus prÃ©visibles</li>
+                            </ul>
+                            <div class="bg-orange-50 p-3 rounded">
+                                <p class="text-orange-800"><strong>âš ï¸ Important :</strong> Pas d'autoconsommation. Vous continuez Ã  payer votre Ã©lectricitÃ© normalement.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <input type="hidden" id="objectif_choisi" name="objectif">
+                
+                <!-- Option batterie -->
+                <div class="bg-blue-50 p-4 rounded-lg mb-6">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="avec_batterie" name="avec_batterie" class="mr-3">
+                        <div>
+                            <span class="font-semibold">ðŸ”‹ Ajouter une batterie de stockage</span>
+                            <p class="text-sm text-gray-600">Optimise l'autoconsommation (Phase 3 - bientÃ´t disponible)</p>
+                        </div>
+                    </label>
+                </div>
+                
+                <div class="flex gap-4">
+                    <button type="button" onclick="prevStep(2)" 
+                            class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
+                        <i class="fas fa-arrow-left mr-2"></i> Retour
+                    </button>
+                    <button type="button" onclick="calculerConfiguration()" 
+                            class="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition">
+                        Calculer la configuration optimale <i class="fas fa-calculator ml-2"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- ========== Ã‰TAPE 4 : CONFIGURATION ========== -->
+            <div class="form-section hidden" id="section-4">
+                <h2 class="text-2xl font-bold mb-6 flex items-center">
+                    <span class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white mr-3">4</span>
+                    âš™ï¸ Configuration optimisÃ©e pour vous
+                </h2>
+                
+                <!-- RÃ©sultats du calcul -->
+                <div class="config-result mb-6">
+                    <h3 class="text-2xl font-bold mb-4 text-center">ðŸ’¡ Puissance recommandÃ©e</h3>
+                    <div class="text-center mb-4">
+                        <div class="text-6xl font-bold" id="puissance-recommandee">--.-- kWc</div>
+                    </div>
+                    
+                    <div class="grid md:grid-cols-3 gap-4">
+                        <div class="config-metric">
+                            <div class="text-sm opacity-90">Production estimÃ©e</div>
+                            <div class="text-2xl font-bold" id="production-estimee">--</div>
+                            <div class="text-xs">kWh/an</div>
+                        </div>
+                        <div class="config-metric">
+                            <div class="text-sm opacity-90">Autoconsommation</div>
+                            <div class="text-2xl font-bold" id="taux-autoconso">--</div>
+                            <div class="text-xs">%</div>
+                        </div>
+                        <div class="config-metric">
+                            <div class="text-sm opacity-90">Ã‰conomies annuelles</div>
+                            <div class="text-2xl font-bold" id="economies-annuelles">--</div>
+                            <div class="text-xs">â‚¬/an</div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 p-4 bg-white bg-opacity-20 rounded-lg">
+                        <p class="text-sm" id="explication-config">--</p>
+                    </div>
+                </div>
+                
+                <!-- ParamÃ¨tres techniques -->
+                <div class="bg-gray-50 p-6 rounded-lg mb-6">

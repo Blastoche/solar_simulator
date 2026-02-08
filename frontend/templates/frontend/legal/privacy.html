@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}Politique de Confidentialité - Solar Simulator{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-12">
+    <div class="container mx-auto px-4 max-w-4xl">
+        
+        <div class="bg-white rounded-2xl shadow-xl p-8 md:p-12">
+            
+            <h1 class="text-4xl font-bold mb-8 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Politique de Confidentialité
+            </h1>
+            
+            <div class="prose prose-lg max-w-none">
+                
+                <div class="bg-blue-50 border-l-4 border-blue-600 p-4 mb-8">
+                    <p class="text-gray-700">
+                        <strong>🔒 Votre vie privée nous importe.</strong><br>
+                        Cette politique explique quelles données nous collectons, pourquoi, et comment vous pouvez les contrôler.
+                    </p>
+                </div>
+                
+                <section class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">1. Responsable du traitement</h2>
+                    <p class="text-gray-700 mb-2"><strong>Responsable :</strong> [Votre nom/société]</p>
+                    <p class="text-gray-700 mb-2"><strong>Email :</strong> contact@solar-simulator.fr</p>
+                    <p class="text-gray-700 mb-2"><strong>Adresse :</strong> [Votre adresse]</p>
+                </section>
+                
+                <section class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">2. Données collectées</h2>
+                    
+                    <h3 class="text-xl font-semibold text-gray-700 mb-3 mt-6">2.1. Données de simulation</h3>
+                    <p class="text-gray-700 mb-2">Lorsque vous utilisez notre simulateur, nous collectons :</p>
+                    <ul class="list-disc ml-6 text-gray-700 space-y-2">
+                        <li><strong>Localisation :</strong> Adresse, coordonnées GPS (pour les calculs météo)</li>
+                        <li><strong>Consommation électrique :</strong> kWh annuels, profil de consommation</li>
+                        <li><strong>Configuration souhaitée :</strong> Puissance, orientation, inclinaison</li>
+                        <li><strong>Données techniques :</strong> Résultats de simulation, graphiques</li>
+                    </ul>
+                    
+                    <h3 class="text-xl font-semibold text-gray-700 mb-3 mt-6">2.2. Données de navigation</h3>
+                    <ul class="list-disc ml-6 text-gray-700 space-y-2">
+                        <li>Adresse IP</li>
+                        <li>Type de navigateur et système d'exploitation</li>
+                        <li>Pages visitées et durée</li>
+                        <li>Source de la visite (moteur de recherche, lien direct, etc.)</li>
+                    </ul>
+                    
+                    <h3 class="text-xl font-semibold text-gray-700 mb-3 mt-6">2.3. Cookies</h3>
+                    <p class="text-gray-700 mb-2">Nous utilisons les cookies suivants :</p>
+                    <ul class="list-disc ml-6 text-gray-700 space-y-2">
+                        <li><strong>Cookies essentiels :</strong> Session utilisateur, préférences (obligatoires)</li>
+                        <li><strong>Cookies analytiques :</strong> Google Analytics (optionnels, avec votre consentement)</li>
+                    </ul>
+                </section>
+                
+                <section class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">3. Finalité du traitement</h2>
+                    <p class="text-gray-700 mb-4">Nous utilisons vos données pour :</p>
+                    <ul class="list-disc ml-6 text-gray-700 space-y-2">
+                        <li>✅ Effectuer les simulations solaires (base légale : exécution du service)</li>
+                        <li>✅ Générer les rapports PDF (base légale : exécution du service)</li>
+                        <li>✅ Améliorer nos algorithmes de calcul (base légale : intérêt légitime)</li>
+                        <li>✅ Analyser l'utilisation du site (base légale : consentement)</li>
+                        <li>✅ Vous recontacter si vous en faites la demande (base légale : consentement)</li>
+                    </ul>
+                </section>
+                
+                <section class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">4. Durée de conservation</h2>
+                    <table class="w-full border-collapse mt-4">
+                        <thead>
+                            <tr class="bg-gray-100">
+                                <th class="border p-3 text-left">Type de données</th>
+                                <th class="border p-3 text-left">Durée</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="border p-3">Simulations (session)</td>
+                                <td class="border p-3">Supprimées après fermeture navigateur</td>
+                            </tr>
+                            <tr>
+                                <td class="border p-3">Logs serveur</td>
+                                <td class="border p-3">6 mois maximum</td>
+                            </tr>
+                            <tr>
+                                <td class="border p-3">Cookies analytiques</td>
+                                <td class="border p-3">13 mois</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+                
+                <section class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">5. Vos droits (RGPD)</h2>
+                    <p class="text-gray-700 mb-4">Conformément au RGPD, vous disposez des droits suivants :</p>
+                    
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-gray-800 mb-2">✓ Droit d'accès</h4>
+                            <p class="text-sm text-gray-700">Obtenir une copie de vos données</p>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-gray-800 mb-2">✓ Droit de rectification</h4>
+                            <p class="text-sm text-gray-700">Corriger des données inexactes</p>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-gray-800 mb-2">✓ Droit à l'effacement</h4>
+                            <p class="text-sm text-gray-700">Supprimer vos données</p>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-gray-800 mb-2">✓ Droit d'opposition</h4>
+                            <p class="text-sm text-gray-700">Refuser certains traitements</p>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 p-4 bg-green-50 border-l-4 border-green-600">
+                        <p class="text-gray-700">
+                            <strong>Pour exercer vos droits :</strong><br>
+                            Contactez-nous à <a href="mailto:contact@solar-simulator.fr" class="text-blue-600 hover:underline">contact@solar-simulator.fr</a><br>
+                            Nous vous répondrons sous 1 mois maximum.
+                        </p>
+                    </div>
+                </section>
+                
+                <section class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">6. Sécurité</h2>
+                    <p class="text-gray-700 mb-4">Nous mettons en œuvre les mesures suivantes :</p>
+                    <ul class="list-disc ml-6 text-gray-700 space-y-2">
+                        <li>🔒 Connexion HTTPS (chiffrement SSL/TLS)</li>
+                        <li>🔒 Hébergement sécurisé (serveurs en France/UE)</li>
+                        <li>🔒 Accès restreint aux données</li>
+                        <li>🔒 Sauvegardes régulières</li>
+                    </ul>
+                </section>
+                
+                <section class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">7. Partage des données</h2>
+                    <p class="text-gray-700 mb-4">
+                        ❌ Nous ne vendons JAMAIS vos données à des tiers.
+                    </p>
+                    <p class="text-gray-700 mb-2">Nous partageons vos données uniquement avec :</p>
+                    <ul class="list-disc ml-6 text-gray-700 space-y-2">
+                        <li><strong>Notre hébergeur :</strong> [Nom hébergeur] (nécessaire pour le fonctionnement du service)</li>
+                        <li><strong>Services analytiques :</strong> Google Analytics (anonymisé, avec votre consentement)</li>
+                    </ul>
+                </section>
+                
+                <section class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">8. Réclamation</h2>
+                    <p class="text-gray-700">
+                        Si vous estimez que vos droits ne sont pas respectés, vous pouvez déposer une réclamation auprès de la CNIL :
+                    </p>
+                    <div class="mt-4 p-4 bg-gray-100 rounded-lg">
+                        <p class="text-gray-700">
+                            <strong>CNIL</strong><br>
+                            3 Place de Fontenoy<br>
+                            TSA 80715<br>
+                            75334 PARIS CEDEX 07<br>
+                            Site web : <a href="https://www.cnil.fr" target="_blank" class="text-blue-600 hover:underline">www.cnil.fr</a>
+                        </p>
+                    </div>
+                </section>
+                
+                <div class="mt-8 p-4 bg-gray-100 rounded-lg">
+                    <p class="text-sm text-gray-600">
+                        <strong>Dernière mise à jour :</strong> {{ "now"|date:"d/m/Y" }}
+                    </p>
+                </div>
+                
+            </div>
+            
+        </div>
+        
+    </div>
+</div>
+{% endblock %}

@@ -11,7 +11,8 @@ from django.views.decorators.csrf import csrf_exempt
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
+from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 from django.views.generic import TemplateView, CreateView, DetailView
 from django.template.loader import render_to_string
@@ -39,6 +40,9 @@ from datetime import datetime
 from battery.pricing import get_battery_price, compare_battery_brands
 from battery.services.sizing import recommend_battery_size, compare_battery_sizes
 
+from frontend.consumption_forms import ConsumptionConfigurationForm
+from solar_calc.models import ConsumptionProfileModel
+
 logger = logging.getLogger(__name__)
 
 
@@ -49,7 +53,7 @@ class HomeView(TemplateView):
     """
     Page d'accueil / Landing page.
     """
-    template_name = 'home.html'
+    template_name = 'frontend/home.html'
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -98,41 +102,91 @@ class SimulationFormView(CreateView):
     template_name = 'frontend/simulation/form.html'
     
     def get_initial(self):
-        """Pré-remplir le formulaire depuis la consommation"""
+        """Pré-remplir le formulaire depuis le profil de consommation"""
         initial = super().get_initial()
+
+        # ===== NOUVEAU : Récupérer profil_id depuis l'URL =====
+        profil_id = self.request.GET.get('profil_id')
+        if profil_id:
+            try:
+                # Charger le profil de consommation
+                profil = ConsumptionProfileModel.objects.get(id=profil_id)
+
+                logger.info(f"✅ Profil de consommation chargé : {profil.nom} (ID: {profil_id})")
+                
+                # Pré-remplir les champs
+                initial.update({
+                    'consommation_annuelle': profil.consommation_annuelle_kwh or 5000,
+                    'nb_personnes': profil.nb_personnes,
+                    'surface_habitable': profil.surface_habitable,
+                })
+                
+                # Stocker le profil_id en session pour le lier plus tard
+                self.request.session['consumption_profile_id'] = profil_id
+                
+                # Message informatif
+                import json
+                if profil.appareils_json:
+                    try:
+                        appareils = json.loads(profil.appareils_json)
+                        nb_appareils = len(appareils.get('appareils', {}))
+                        messages.info(
+                            self.request,
+                            f"📊 Simulation basée sur votre profil '{profil.nom}' avec {nb_appareils} appareils programmables"
+                        )
+                    except:
+                        pass
+                
+                return initial
+                
+            except ConsumptionProfileModel.DoesNotExist:
+                logger.warning(f"⚠️ Profil {profil_id} introuvable")
+            except Exception as e:
+                logger.error(f"❌ Erreur chargement profil: {e}")
         
+        # ===== ANCIEN SYSTÈME (garder pour compatibilité) =====
         # Récupérer les données stockées en session
         prefill_data = self.request.session.get('prefill_from_consumption')
-        
+
         if prefill_data:
             logger.info(f"Pré-remplissage formulaire PV depuis consommation {prefill_data['consommation_id']}")
-            
-            # Pré-remplir les champs du formulaire
+
             initial.update({
-                # Champs de consommation (pas dans le modèle Installation)
                 'consommation_annuelle': prefill_data['consommation_annuelle'],
                 'nb_personnes': prefill_data['nb_personnes'],
                 'surface_habitable': prefill_data['surface_habitable'],
-                
-                # Localisation
                 'latitude': prefill_data['latitude'],
                 'longitude': prefill_data['longitude'],
                 'adresse': prefill_data.get('adresse', ''),
-                
-                # Configuration technique suggérée
                 'puissance_kw': prefill_data['puissance_suggeree'],
-                'orientation': prefill_data.get('orientation_suggeree', 'S'),  # ✅ 'S' pour Sud
-                'inclinaison': prefill_data.get('inclinaison_suggeree', 30),   # 30°
+                'orientation': prefill_data.get('orientation_suggeree', 'S'),
+                'inclinaison': prefill_data.get('inclinaison_suggeree', 30),
             })
-            
-            # Stocker l'ID de consommation pour la relation
+
             self.request.session['consommation_source_id'] = prefill_data['consommation_id']
-        
+
         return initial
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['page'] = 'simulateur_gratuit'
+        
+        # 🆕 VÉRIFIER SI ON DOIT RESTAURER LES DONNÉES
+        restore = self.request.GET.get('restore')
+        profil_id = self.request.GET.get('profil_id')
+
+        if restore == '1' and profil_id:
+            context['restore_mode'] = True
+            context['start_step'] = 3
+            
+            # 🆕 CHARGER LA CONSOMMATION DU PROFIL
+            try:
+                profil = ConsumptionProfileModel.objects.get(id=profil_id)
+                context['consommation_from_profil'] = profil.consommation_annuelle_kwh or 5000
+                logger.info(f"🔄 Mode restauration activé - consommation: {context['consommation_from_profil']} kWh")
+            except ConsumptionProfileModel.DoesNotExist:
+                context['consommation_from_profil'] = 5000
+                logger.warning(f"⚠️ Profil {profil_id} introuvable")
         
         # Passer les données de pré-remplissage au template
         prefill_data = self.request.session.get('prefill_from_consumption')
@@ -150,8 +204,42 @@ class SimulationFormView(CreateView):
         Crée l'installation et lance la simulation.
         """
         try:
-            installation = form.save(commit=False)
+            installation = form.save(commit=False)  
             installation.user = self.request.user if self.request.user.is_authenticated else None
+
+
+            # Validation et lien OBLIGATOIRE du profil 
+            consumption_profile_id = self.request.session.get('consumption_profile_id')
+                        
+            if not consumption_profile_id:
+                logger.error("❌ Aucun profil de consommation trouvé en session")
+                messages.error(
+                    self.request,
+                    "❌ Erreur : Profil de consommation manquant. "
+                    "Veuillez compléter le formulaire de consommation."
+                )
+                return redirect('frontend:configure_consumption')
+
+            # Récupérer et lier le profil
+            try:
+                profil = ConsumptionProfileModel.objects.get(id=consumption_profile_id)
+                
+                # ✅ LIEN DIRECT via ForeignKey (au lieu de copier les données)
+                installation.consumption_profile = profil
+                
+                logger.info(f"✅ Profil '{profil.nom}' (ID: {consumption_profile_id}) lié à l'installation")
+                
+                # Nettoyer la session
+                del self.request.session['consumption_profile_id']
+                
+            except ConsumptionProfileModel.DoesNotExist:
+                logger.error(f"❌ Profil {consumption_profile_id} introuvable en base")
+                messages.error(
+                    self.request,
+                    "❌ Erreur : Profil de consommation introuvable. Veuillez réessayer."
+                )
+                return redirect('frontend:configure_consumption')
+
             # Lier à la consommation source si elle existe
             consommation_source_id = self.request.session.get('consommation_source_id')
             if consommation_source_id:
@@ -1698,4 +1786,91 @@ def export_pdf_expert(request, consommation_id):
             f"Erreur lors de la génération du PDF: {str(e)}", 
             status=500
         )
+# ===== VUES LÉGALES =====
+
+class MentionsLegalesView(TemplateView):
+    template_name = 'frontend/legal/mentions.html'
+
+class PrivacyView(TemplateView):
+    template_name = 'frontend/legal/privacy.html'
+
+class CGVView(TemplateView):
+    template_name = 'frontend/legal/cgv.html'    
+
+# ============================================================================
+# VUES CONFIGURATION CONSOMMATION
+# ============================================================================
+
+#@login_required
+def configure_consumption(request):
+    """
+    Vue pour configurer le profil de consommation.
+    """
+    if request.method == 'POST':
+        form = ConsumptionConfigurationForm(request.POST)
+        
+        if form.is_valid():
+            # Sauvegarder le profil
+            if request.user.is_authenticated:
+                profil = form.save(user=request.user)
+                
+                # ✅ CRUCIAL : Stocker en session AVANT de rediriger
+                request.session['consumption_profile_id'] = profil.id
+                
+                # Compter les appareils
+                import json
+                try:
+                    appareils = json.loads(profil.appareils_json)
+                    nb_appareils = len(appareils.get('appareils', {}))
+                except:
+                    nb_appareils = 0
+                
+                # Message de succès
+                messages.success(
+                    request,
+                    f"✅ Profil '{profil.nom}' créé avec succès ! {nb_appareils} appareils programmables identifiés."
+                )
+                
+                # VÉRIFIER SI ON DOIT REVENIR À LA SIMULATION
+                return_to = request.GET.get('return')
+                
+                if return_to == 'simulation':
+                    # Rediriger vers la simulation en mode restauration
+                    return redirect(f'/simulation/?profil_id={profil.id}&restore=1')
+                else:
+                    # Redirection normale
+                    return redirect(f'/simulation/?profil_id={profil.id}')
+            else:
+                messages.warning(
+                    request,
+                    "⚠️ Vous devez être connecté pour sauvegarder votre profil."
+                )
+                return redirect('frontend:home')
+        
+        else:
+            messages.error(
+                request,
+                "❌ Erreur dans le formulaire. Veuillez corriger les erreurs."
+            )
     
+    else:
+        # GET : Formulaire vide ou pré-rempli
+        if request.user.is_authenticated:
+            existing_profil = ConsumptionProfileModel.objects.filter(
+                user=request.user
+            ).first()
+            
+            if existing_profil:
+                form = ConsumptionConfigurationForm(instance=existing_profil)
+            else:
+                form = ConsumptionConfigurationForm()
+        else:
+            # Utilisateur non connecté : formulaire vide
+            form = ConsumptionConfigurationForm()
+        
+        context = {
+            'form': form,
+            'page_title': 'Configuration de votre profil de consommation'
+        }
+        
+        return render(request, 'frontend/configure_consumption.html', context)

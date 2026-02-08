@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+    
+    <!-- En-tête -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">
+            Configuration de votre profil de consommation
+        </h1>
+        <p class="text-gray-600">
+            Pour calculer précisément votre potentiel d'autoconsommation solaire,
+            nous avons besoin de quelques informations sur votre consommation électrique.
+        </p>
+    </div>
+
+    <!-- Formulaire -->
+    <form method="post" class="space-y-8">
+        {% csrf_token %}
+
+        <!-- Section 1 : Informations de base -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-semibold mb-4">📋 Informations de base</h2>
+            
+            <div class="space-y-4">
+                <!-- Nom du profil -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Nom du profil
+                    </label>
+                    {{ form.nom }}
+                    {% if form.nom.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.nom.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Consommation annuelle -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Consommation annuelle (kWh/an)
+                    </label>
+                    <div class="flex items-center space-x-4">
+                        {{ form.consommation_annuelle_kwh }}
+                        <span class="text-gray-700 font-medium">kWh/an</span>
+                    </div>
+                    <p class="mt-2 text-sm text-gray-600">
+                        Moyenne française : 4 700 kWh/an
+                    </p>
+                    {% if form.consommation_annuelle_kwh.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.consommation_annuelle_kwh.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Nombre de personnes -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Nombre de personnes
+                    </label>
+                    {{ form.nb_personnes }}
+                    {% if form.nb_personnes.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.nb_personnes.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Période OU DPE (au moins un obligatoire) -->
+                <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <p class="text-sm text-blue-900 font-semibold mb-4">
+                        ⚠️ Renseignez au moins l'un des deux champs suivants :
+                    </p>
+                    
+                    <div class="space-y-4">
+                        <!-- Période de construction -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                📅 Période de construction
+                            </label>
+                            {{ form.periode_construction }}
+                            <p class="mt-1 text-xs text-gray-600">
+                                Si vous ne connaissez pas votre DPE
+                            </p>
+                            {% if form.periode_construction.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.periode_construction.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+
+                        <!-- DPE -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Classe énergétique (DPE)
+                            </label>
+                            {{ form.dpe }}
+                            {% if form.dpe.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.dpe.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>        
+                <!-- Surface habitable -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Surface habitable (m²)
+                    </label>
+                    {{ form.surface_habitable }}
+                    {% if form.surface_habitable.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.surface_habitable.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                
+            </div>
+        </div>
+
+        <!-- Section 2 : Équipements électriques -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-semibold mb-4">⚡ Équipements électriques</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Chauffage -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Type de chauffage
+                    </label>
+                    {{ form.type_chauffage }}
+                    {% if form.type_chauffage.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.type_chauffage.errors.0 }}</p>
+                    {% endif %}
+                </div>
+                
+                <!-- Eau chaude -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Eau chaude sanitaire
+                    </label>
+                    {{ form.type_ecs }}
+                    {% if form.type_ecs.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.type_ecs.errors.0 }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 3 : Profil d'occupation -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-semibold mb-4">👤 Profil d'occupation</h2>
+            
+            <div class="space-y-3">
+                {{ form.profile_type }}
+            </div>
+            {% if form.profile_type.errors %}
+            <p class="mt-2 text-sm text-red-600">{{ form.profile_type.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Section 4 : Appareils programmables -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-semibold mb-4">🔌 Appareils programmables</h2>
+            <p class="text-sm text-gray-600 mb-4">
+                Cochez les appareils programmables que vous possédez.
+            </p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                    {{ form.appareil_lave_linge }}
+                    <span class="ml-3">Lave-linge</span>
+                </label>
+                
+                <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                    {{ form.appareil_lave_vaisselle }}
+                    <span class="ml-3">Lave-vaisselle</span>
+                </label>
+                
+                <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                    {{ form.appareil_seche_linge }}
+                    <span class="ml-3">Sèche-linge</span>
+                </label>
+                
+                <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                    {{ form.appareil_vehicule_electrique }}
+                    <span class="ml-3">Véhicule électrique</span>
+                </label>
+                
+                <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                    {{ form.appareil_piscine }}
+                    <span class="ml-3">Piscine / Spa</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Boutons -->
+        <div class="flex justify-between">
+            <a href="{% url 'frontend:home' %}" 
+               class="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                ← Retour
+            </a>
+            <button type="submit" 
+                    class="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow">
+                Valider mon profil →
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

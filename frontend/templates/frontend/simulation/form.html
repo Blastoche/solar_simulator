@@ -47,6 +47,24 @@
 {% endblock %}
 
 {% block content %}
+<!-- Bandeau profil de consommation -->
+{% if request.GET.profil_id %}
+<div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+    <div class="flex items-center">
+        <div class="flex-shrink-0">
+            <svg class="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </div>
+        <div class="ml-3">
+            <p class="text-sm font-medium text-blue-800">
+                ✅ Votre profil de consommation est bien pris en compte dans cette simulation
+            </p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-12">
     <div class="container mx-auto px-4">
         
@@ -171,6 +189,15 @@
                                     <input type="number" id="consommation_annuelle" name="consommation_annuelle"
                                            class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
                                            placeholder="Ex: 5000" min="1000" max="50000">
+                                    <div class="mt-3 text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                        <p class="text-sm text-blue-800 mb-2">
+                                            💡 Besoin d'une estimation plus précise avec vos appareils ?
+                                        </p>
+                                        <a href="#" id="detailed-consumption-link" 
+                                        class="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-semibold">
+                                            📋 Remplir le formulaire détaillé (2 min)
+                                        </a>
+                                    </div>
                                     <p class="text-xs text-gray-500 mt-1">kWh/an (voir sur votre facture EDF)</p>
                                 </div>
                             </div>
@@ -637,6 +664,8 @@
     }
     
     // Pré-remplissage si données de consommation
+    // ✅ DÉSACTIVÉ EN MODE RESTAURATION pour éviter les conflits
+    {% if not restore_mode %}
     if (consoData) {
         updateLocation(consoData.latitude, consoData.longitude, consoData.adresse || '');
         map.setView([consoData.latitude, consoData.longitude], 13);
@@ -665,6 +694,7 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }, 1000);
     }
+    {% endif %}
     
     // ===== SÉLECTION OPTIONS =====
     function selectConsoOption(option) {
@@ -777,5 +807,118 @@
         document.getElementById('submit-button').innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Lancement...';
         this.submit();
     });
+
+// 🆕 GESTION DU LIEN FORMULAIRE DÉTAILLÉ
+document.addEventListener('DOMContentLoaded', function() {
+    const detailedLink = document.getElementById('detailed-consumption-link');
+    
+    if (detailedLink) {
+        detailedLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Récupérer toutes les données du formulaire
+            const formData = {
+                adresse: document.getElementById('adresse-input').value,
+                latitude: document.getElementById('latitude-input').value,
+                longitude: document.getElementById('longitude-input').value,
+                consommation_annuelle: document.getElementById('consommation_annuelle').value || '',
+                current_step: 2
+            };
+            
+            // Sauvegarder en sessionStorage
+            sessionStorage.setItem('simulation_partial', JSON.stringify(formData));
+            console.log('💾 Données sauvegardées:', formData);
+            
+            // Rediriger vers le formulaire détaillé
+            window.location.href = '/consumption/configure/?return=simulation';
+        });
+    }
+});
+
+
+// 🆕 RESTAURATION DES DONNÉES AU RETOUR
+{% if restore_mode %}
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔄 Mode restauration activé');
+    
+    // 🆕 REMPLIR LE CHAMP CONSOMMATION DEPUIS LE PROFIL
+    {% if consommation_from_profil %}
+    const consoValue = {{ consommation_from_profil }};
+    document.getElementById('consommation_finale').value = consoValue;
+    console.log('✅ Consommation pré-remplie: ' + consoValue + ' kWh');
+    {% endif %}
+    
+    // Récupérer données de sessionStorage (optionnel)
+    const savedData = sessionStorage.getItem('simulation_partial');
+    
+    setTimeout(function() {
+        // ✅ RESTAURER LES DONNÉES SI DISPONIBLES
+        if (savedData) {
+            const data = JSON.parse(savedData);
+            console.log('📦 Données à restaurer:', data);
+            
+            // Restaurer les champs
+            if (data.adresse) document.getElementById('adresse-input').value = data.adresse;
+            if (data.latitude) {
+                document.getElementById('latitude-input').value = data.latitude;
+                document.getElementById('display-lat').textContent = data.latitude + '°';
+            }
+            if (data.longitude) {
+                document.getElementById('longitude-input').value = data.longitude;
+                document.getElementById('display-lon').textContent = data.longitude + '°';
+            }
+            
+            // Carte
+            if (data.latitude && data.longitude && map) {
+                map.setView([data.latitude, data.longitude], 13);
+                if (marker) {
+                    marker.setLatLng([data.latitude, data.longitude]);
+                } else {
+                    const customIcon = L.icon({
+                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                        iconSize: [25, 41],
+                        iconAnchor: [12, 41]
+                    });
+                    marker = L.marker([data.latitude, data.longitude], { icon: customIcon }).addTo(map);
+                }
+            }
+            
+            sessionStorage.removeItem('simulation_partial');
+        } else {
+            console.log('ℹ️ Pas de données en sessionStorage (normal si retour depuis formulaire de consommation)');
+        }
+        
+        // ✅ TOUJOURS PASSER À L'ÉTAPE 3 EN MODE RESTAURATION
+        // (que savedData existe ou non)
+        
+        // Marquer étapes 1 et 2 complétées
+        document.getElementById('step-1').classList.add('completed');
+        document.getElementById('step-2').classList.add('completed');
+        document.getElementById('section-1').classList.add('hidden');
+        document.getElementById('section-2').classList.add('hidden');
+        
+        // ✅ Pré-sélectionner l'option "consommation analysée"
+        const radioAnalysee = document.querySelector('input[value="analysee"]');
+        if (radioAnalysee) {
+            radioAnalysee.checked = true;
+            document.getElementById('conso-analysee-details')?.classList.remove('hidden');
+            const consoValueDisplay = document.getElementById('conso-value');
+            if (consoValueDisplay) {
+                consoValueDisplay.textContent = {{ consommation_from_profil }};
+            }
+        }
+        
+        // ✅ Aller à l'étape 3
+        currentStep = 3;
+        document.getElementById('section-3').classList.remove('hidden');
+        document.getElementById('step-3').classList.add('active');
+        
+        console.log('✅ Étape 3 affichée - Prêt à choisir un objectif');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 500);
+});
+{% endif %}
+
 </script>
 {% endblock %}

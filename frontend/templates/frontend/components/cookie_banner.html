@@ -1,0 +1,154 @@
+<!-- Bannière Cookies - RGPD -->
+<div id="cookie-banner" class="fixed bottom-0 left-0 right-0 bg-gray-900 text-white p-4 shadow-2xl z-50 transform transition-transform duration-300" style="display: none;">
+    <div class="container mx-auto max-w-6xl">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+            
+            <!-- Texte -->
+            <div class="flex-1">
+                <p class="text-sm md:text-base">
+                    🍪 <strong>Cookies et vie privée</strong><br class="md:hidden">
+                    Nous utilisons des cookies pour améliorer votre expérience et analyser notre trafic. 
+                    <a href="{% url 'frontend:privacy' %}" class="underline hover:text-blue-300">En savoir plus</a>
+                </p>
+            </div>
+            
+            <!-- Boutons -->
+            <div class="flex gap-3">
+                <button 
+                    id="cookie-accept" 
+                    class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors">
+                    Tout accepter
+                </button>
+                <button 
+                    id="cookie-reject" 
+                    class="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors">
+                    Refuser
+                </button>
+                <button 
+                    id="cookie-customize" 
+                    class="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors">
+                    Personnaliser
+                </button>
+            </div>
+            
+        </div>
+    </div>
+</div>
+
+<!-- Modal Personnalisation -->
+<div id="cookie-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style="display: none;">
+    <div class="bg-white rounded-xl max-w-2xl w-full p-6 md:p-8">
+        <h3 class="text-2xl font-bold mb-4 text-gray-800">🍪 Gestion des cookies</h3>
+        
+        <div class="space-y-4 mb-6">
+            <!-- Cookies essentiels -->
+            <div class="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
+                <input type="checkbox" id="cookie-essential" checked disabled class="mt-1">
+                <div class="flex-1">
+                    <label class="font-semibold text-gray-800 block mb-1">Cookies essentiels</label>
+                    <p class="text-sm text-gray-600">
+                        Nécessaires au fonctionnement du site (session, sécurité). 
+                        Ne peuvent pas être désactivés.
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Cookies analytiques -->
+            <div class="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
+                <input type="checkbox" id="cookie-analytics" class="mt-1">
+                <div class="flex-1">
+                    <label for="cookie-analytics" class="font-semibold text-gray-800 block mb-1 cursor-pointer">
+                        Cookies analytiques
+                    </label>
+                    <p class="text-sm text-gray-600">
+                        Nous aident à comprendre comment vous utilisez le site (Google Analytics anonymisé).
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="flex gap-3 justify-end">
+            <button id="cookie-modal-close" class="px-6 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition-colors">
+                Annuler
+            </button>
+            <button id="cookie-modal-save" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors">
+                Enregistrer
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Script de gestion cookies -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const banner = document.getElementById('cookie-banner');
+    const modal = document.getElementById('cookie-modal');
+    const cookieConsent = localStorage.getItem('cookieConsent');
+    
+    // Afficher la bannière si pas de consentement
+    if (!cookieConsent) {
+        banner.style.display = 'block';
+    }
+    
+    // Accepter tous
+    document.getElementById('cookie-accept').addEventListener('click', function() {
+        localStorage.setItem('cookieConsent', JSON.stringify({
+            essential: true,
+            analytics: true,
+            timestamp: new Date().toISOString()
+        }));
+        banner.style.display = 'none';
+        enableAnalytics();
+    });
+    
+    // Refuser optionnels
+    document.getElementById('cookie-reject').addEventListener('click', function() {
+        localStorage.setItem('cookieConsent', JSON.stringify({
+            essential: true,
+            analytics: false,
+            timestamp: new Date().toISOString()
+        }));
+        banner.style.display = 'none';
+    });
+    
+    // Ouvrir modal personnalisation
+    document.getElementById('cookie-customize').addEventListener('click', function() {
+        modal.style.display = 'flex';
+    });
+    
+    // Fermer modal
+    document.getElementById('cookie-modal-close').addEventListener('click', function() {
+        modal.style.display = 'none';
+    });
+    
+    // Sauvegarder préférences
+    document.getElementById('cookie-modal-save').addEventListener('click', function() {
+        const analyticsChecked = document.getElementById('cookie-analytics').checked;
+        localStorage.setItem('cookieConsent', JSON.stringify({
+            essential: true,
+            analytics: analyticsChecked,
+            timestamp: new Date().toISOString()
+        }));
+        banner.style.display = 'none';
+        modal.style.display = 'none';
+        
+        if (analyticsChecked) {
+            enableAnalytics();
+        }
+    });
+    
+    // Activer Google Analytics si accepté
+    function enableAnalytics() {
+        // TODO: Ajouter votre code Google Analytics ici
+        console.log('Analytics activé');
+    }
+    
+    // Charger analytics si déjà consenti
+    if (cookieConsent) {
+        const consent = JSON.parse(cookieConsent);
+        if (consent.analytics) {
+            enableAnalytics();
+        }
+    }
+});
+</script>

@@ -1,0 +1,100 @@
+﻿        
+        // Soumettre
+        document.getElementById('submit-button').disabled = true;
+        document.getElementById('submit-button').innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Lancement...';
+        this.submit();
+    });
+
+// ðŸ†• GESTION DU LIEN FORMULAIRE DÃ‰TAILLÃ‰
+document.addEventListener('DOMContentLoaded', function() {
+    const detailedLink = document.getElementById('detailed-consumption-link');
+    
+    if (detailedLink) {
+        detailedLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // RÃ©cupÃ©rer toutes les donnÃ©es du formulaire
+            const formData = {
+                adresse: document.getElementById('adresse-input').value,
+                latitude: document.getElementById('latitude-input').value,
+                longitude: document.getElementById('longitude-input').value,
+                consommation_annuelle: document.getElementById('consommation_annuelle').value || '',
+                current_step: 2
+            };
+            
+            // Sauvegarder en sessionStorage
+            sessionStorage.setItem('simulation_partial', JSON.stringify(formData));
+            console.log('ðŸ’¾ DonnÃ©es sauvegardÃ©es:', formData);
+            
+            // Rediriger vers le formulaire dÃ©taillÃ©
+            window.location.href = '/consumption/configure/?return=simulation';
+        });
+    }
+});
+
+// ðŸ†• RESTAURATION DES DONNÃ‰ES AU RETOUR
+{% if restore_mode %}
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('ðŸ”„ Mode restauration activÃ©');
+    
+    // ðŸ†• REMPLIR LE CHAMP CONSOMMATION DEPUIS LE PROFIL
+    {% if consommation_from_profil %}
+    document.getElementById('consommation_finale').value = {{ consommation_from_profil }};
+        console.log('âœ… Consommation prÃ©-remplie: {{ consommation_from_profil }} kWh');
+        {% endif %}
+        
+        const savedData = sessionStorage.getItem('simulation_partial');
+        
+        if (savedData) {
+            const data = JSON.parse(savedData);
+            console.log('ðŸ“¦ DonnÃ©es Ã  restaurer:', data);
+        
+            setTimeout(function() {
+            // Restaurer les champs
+            if (data.adresse) document.getElementById('adresse-input').value = data.adresse;
+            if (data.latitude) {
+                document.getElementById('latitude-input').value = data.latitude;
+                document.getElementById('display-lat').textContent = data.latitude + 'Â°';
+            }
+            if (data.longitude) {
+                document.getElementById('longitude-input').value = data.longitude;
+                document.getElementById('display-lon').textContent = data.longitude + 'Â°';
+            }
+            
+            // Carte
+            if (data.latitude && data.longitude && map) {
+                map.setView([data.latitude, data.longitude], 13);
+                if (marker) {
+                    marker.setLatLng([data.latitude, data.longitude]);
+                } else {
+                    const customIcon = L.icon({
+                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                        iconSize: [25, 41],
+                        iconAnchor: [12, 41]
+                    });
+                    marker = L.marker([data.latitude, data.longitude], { icon: customIcon }).addTo(map);
+                }
+            }
+            
+            // Marquer Ã©tapes 1 et 2 complÃ©tÃ©es
+            document.getElementById('step-1').classList.add('completed');
+            document.getElementById('step-2').classList.add('completed');
+            document.getElementById('section-1').classList.add('hidden');
+            document.getElementById('section-2').classList.add('hidden');
+            
+            // Aller Ã  l'Ã©tape 3
+            currentStep = 3;
+            document.getElementById('section-3').classList.remove('hidden');
+            document.getElementById('step-3').classList.add('active');
+            
+            sessionStorage.removeItem('simulation_partial');
+            console.log('âœ… Ã‰tape 3 affichÃ©e');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 500);
+    }
+});
+{% endif %}
+
+</script>
+{% endblock %}

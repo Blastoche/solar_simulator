@@ -1,0 +1,200 @@
+﻿        
+        if (query.length < 3) {
+            suggestionsDiv.classList.remove('show');
+            return;
+        }
+        
+        searchTimeout = setTimeout(() => {
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=fr&limit=5`)
+                .then(response => response.json())
+                .then(data => {
+                    suggestionsDiv.innerHTML = '';
+                    
+                    if (data.length > 0) {
+                        data.forEach(item => {
+                            const div = document.createElement('div');
+                            div.className = 'suggestion-item';
+                            div.textContent = item.display_name;
+                            div.onclick = () => {
+                                const lat = parseFloat(item.lat).toFixed(6);
+                                const lon = parseFloat(item.lon).toFixed(6);
+                                
+                                addressInput.value = item.display_name;
+                                updateLocation(lat, lon, item.display_name);
+                                map.setView([lat, lon], 13);
+                                
+                                if (marker) {
+                                    marker.setLatLng([lat, lon]);
+                                } else {
+                                    marker = L.marker([lat, lon], { icon: customIcon }).addTo(map);
+                                }
+                                
+                                suggestionsDiv.classList.remove('show');
+                            };
+                            suggestionsDiv.appendChild(div);
+                        });
+                        suggestionsDiv.classList.add('show');
+                    } else {
+                        suggestionsDiv.classList.remove('show');
+                    }
+                })
+                .catch(err => {
+                    console.log('Erreur autocomplete:', err);
+                    suggestionsDiv.classList.remove('show');
+                });
+        }, 300);
+    });
+
+    // Fermer suggestions si clic ailleurs
+    document.addEventListener('click', function(e) {
+        if (!addressInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+            suggestionsDiv.classList.remove('show');
+        }
+    });
+    
+    // GÃ©olocalisation
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            const lat = position.coords.latitude.toFixed(6);
+            const lon = position.coords.longitude.toFixed(6);
+            map.setView([lat, lon], 13);
+            marker = L.marker([lat, lon], { icon: customIcon }).addTo(map);
+            updateLocation(lat, lon);
+        });
+    }
+    
+    // PrÃ©-remplissage si donnÃ©es de consommation
+    if (consoData) {
+        updateLocation(consoData.latitude, consoData.longitude, consoData.adresse || '');
+        map.setView([consoData.latitude, consoData.longitude], 13);
+        marker = L.marker([consoData.latitude, consoData.longitude], { icon: customIcon }).addTo(map);
+        
+        // PrÃ©-sÃ©lectionner option A
+        const radioAnalysee = document.querySelector('input[value="analysee"]');
+        const consoDetails = document.getElementById('conso-analysee-details');
+        const consoValue = document.getElementById('conso-value');
+        const consoFinale = document.getElementById('consommation_finale');
+        
+        if (radioAnalysee) radioAnalysee.checked = true;
+        if (consoDetails) consoDetails.classList.remove('hidden');
+        if (consoValue) consoValue.textContent = consoData.consommation_annuelle.toFixed(0);
+        if (consoFinale) consoFinale.value = consoData.consommation_annuelle;
+        
+        // Navigation automatique vers Ã©tape 2 aprÃ¨s 1 seconde
+        setTimeout(() => {
+            console.log('â© Navigation automatique vers Ã©tape 2 (donnÃ©es prÃ©-remplies)');
+            document.getElementById('section-1').classList.add('hidden');
+            document.getElementById('step-1').classList.remove('active');
+            document.getElementById('step-1').classList.add('completed');
+            currentStep = 2;
+            document.getElementById('section-2').classList.remove('hidden');
+            document.getElementById('step-2').classList.add('active');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 1000);
+    }
+    
+    // ===== SÃ‰LECTION OPTIONS =====
+    function selectConsoOption(option) {
+        document.querySelectorAll('input[name="conso_option"]').forEach(el => el.checked = false);
+        document.querySelector(`input[value="${option}"]`).checked = true;
+        
+        document.getElementById('conso-analysee-details').classList.add('hidden');
+        document.getElementById('conso-manuelle-input').classList.add('hidden');
+        
+        if (option === 'analysee') {
+            document.getElementById('conso-analysee-details').classList.remove('hidden');
+            if (consoData) {
+                document.getElementById('consommation_finale').value = consoData.consommation_annuelle;
+            }
+        } else if (option === 'manuelle') {
+            document.getElementById('conso-manuelle-input').classList.remove('hidden');
+        }
+    }
+    
+    // Mise Ã  jour conso manuelle
+    const consoInput = document.getElementById('consommation_annuelle');
+    if (consoInput) {
+        consoInput.addEventListener('input', function() {
+            document.getElementById('consommation_finale').value = this.value;
+        });
+    }
+    
+    function selectObjectif(obj) {
+        document.querySelectorAll('.objectif-card').forEach(el => el.classList.remove('selected'));
+        document.getElementById(`obj-${obj}`).classList.add('selected');
+        document.getElementById('objectif_choisi').value = obj;
+    }
+    
+    // ===== CALCUL CONFIGURATION OPTIMALE =====
+    function calculerConfiguration() {
+        const conso = parseFloat(document.getElementById('consommation_finale').value);
+        const objectif = document.getElementById('objectif_choisi').value;
+        const batterie = document.getElementById('avec_batterie').checked;
+        const latitude = parseFloat(document.getElementById('latitude-input').value);
+        
+        if (!conso || !objectif) {
+            alert('âš ï¸ DonnÃ©es manquantes pour le calcul');
+            return;
+        }
+        
+        // Appel AJAX pour calcul
+        fetch('{% url "frontend:calculate_optimal_power" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                consommation: conso,
+                objectif: objectif,
+                batterie: batterie,
+                latitude: latitude
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Afficher rÃ©sultats
+            document.getElementById('puissance-recommandee').textContent = data.puissance_kw + ' kWc';
+            document.getElementById('production-estimee').textContent = data.production_kwh.toFixed(0);
+            document.getElementById('taux-autoconso').textContent = data.taux_autoconso.toFixed(1);
+            document.getElementById('economies-annuelles').textContent = data.economie_annuelle.toFixed(0);
+            document.getElementById('explication-config').textContent = data.explication;
+            
+            // PrÃ©-remplir formulaire
+            document.getElementById('puissance_kw').value = data.puissance_kw;
+            document.getElementById('id_orientation').value = data.orientation_optimale || 'S';
+            document.getElementById('id_inclinaison').value = data.inclinaison_optimale || 30;
+            
+            // Passer Ã  l'Ã©tape 4
+            nextStep(4);
+        })
+        .catch(error => {
+            console.error('Erreur calcul:', error);
+            alert('Erreur lors du calcul. Veuillez rÃ©essayer.');
+        });
+    }
+    
+    // ===== PERSONNALISATION =====
+    function togglePersonnalisation() {
+        const input = document.getElementById('puissance_kw');
+        const icon = document.getElementById('lock-icon');
+        if (document.getElementById('toggle-perso').checked) {
+            input.readOnly = false;
+            input.classList.add('border-blue-500', 'bg-blue-50');
+            icon.textContent = 'ðŸ”“';
+        } else {
+            input.readOnly = true;
+            input.classList.remove('border-blue-500', 'bg-blue-50');
+            icon.textContent = 'ðŸ”’';
+        }
+    }
+    
+    // ===== SOUMISSION FORMULAIRE =====
+    document.getElementById('simulation-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Validation finale
+        if (!document.getElementById('puissance_kw').value) {
+            alert('âš ï¸ Puissance manquante');
+            return;
+        }

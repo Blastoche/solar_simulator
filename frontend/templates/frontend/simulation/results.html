@@ -45,6 +45,18 @@
                 Voici les résultats détaillés de votre installation solaire
             </p>
         </div>
+
+        <!-- Bouton Télécharger PDF -->
+        <div class="text-center mb-8">
+            <a href="{% url 'reporting:download_pdf' simulation.resultat.id %}" 
+               class="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200">
+                <i class="fas fa-file-pdf text-2xl"></i>
+                <span class="text-lg">Télécharger le Rapport PDF</span>
+            </a>
+            <p class="mt-3 text-sm text-gray-500">
+                Rapport complet avec tous les détails techniques et financiers
+            </p>
+        </div>
         
         <!-- Indicateurs clés (KPIs) -->
         <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
@@ -97,6 +109,148 @@
             </div>
         </div>
         
+        </div>
+    </div>
+    
+    <!-- ✅ NOUVELLE SECTION : COMPARAISON SCÉNARIOS ✅ -->
+        {% if simulation.resultat.gain_autoconso_kwh %}
+        <div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-2xl shadow-lg p-8 mb-12 border-2 border-green-300">
+            <h2 class="text-3xl font-bold text-gray-900 mb-6 flex items-center">
+                <i class="fas fa-lightbulb text-yellow-500 text-3xl mr-3"></i>
+                Potentiel d'optimisation de votre installation
+            </h2>
+            
+            <p class="text-gray-700 mb-8 text-lg">
+                En programmant vos appareils électriques aux heures de production solaire, 
+                vous pouvez considérablement augmenter votre autoconsommation et vos économies.
+            </p>
+            
+            <!-- Comparaison 2 scénarios -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                
+                <!-- Scénario actuel -->
+                <div class="bg-white rounded-xl shadow-md p-6 border-2 border-gray-200">
+                    <div class="flex items-center mb-4">
+                        <div class="w-4 h-4 bg-blue-500 rounded-full mr-3"></div>
+                        <h3 class="text-xl font-bold text-gray-800">📊 Scénario actuel</h3>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-6">Avec vos horaires habituels</p>
+                    
+                    <div class="space-y-4">
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600 mb-1">Autoconsommation</p>
+                            <p class="text-4xl font-bold text-blue-600">
+                                {{ simulation.resultat.autoconsommation_ratio_actuel|floatformat:1 }}%
+                            </p>
+                            <p class="text-sm text-gray-500 mt-1">
+                                {{ simulation.resultat.autoconsommation_kwh_actuel|floatformat:0 }} kWh/an
+                            </p>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600 mb-1">Économies annuelles</p>
+                            <p class="text-3xl font-bold text-gray-800">
+                                {{ simulation.resultat.economie_annuelle_actuel|floatformat:0 }} €
+                            </p>
+                            <p class="text-xs text-gray-500 mt-1">par an</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Scénario optimisé -->
+                <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl shadow-lg p-6 border-3 border-green-400">
+                    <div class="flex items-center mb-4">
+                        <div class="w-4 h-4 bg-green-600 rounded-full mr-3 animate-pulse"></div>
+                        <h3 class="text-xl font-bold text-green-900">⚡ Scénario optimisé</h3>
+                    </div>
+                    <p class="text-sm text-green-700 mb-6 font-medium">
+                        Appareils programmés aux heures solaires (11h-16h)
+                    </p>
+                    
+                    <div class="space-y-4">
+                        <div class="bg-green-100 p-4 rounded-lg border-2 border-green-300">
+                            <p class="text-sm text-green-700 mb-1 font-medium">Autoconsommation</p>
+                            <p class="text-4xl font-bold text-green-700">
+                                {{ simulation.resultat.autoconsommation_ratio_optimise|floatformat:1 }}%
+                            </p>
+                            <p class="text-sm text-green-600 mt-1 font-medium">
+                                {{ simulation.resultat.autoconsommation_kwh_optimise|floatformat:0 }} kWh/an
+                            </p>
+                        </div>
+                        <div class="bg-white p-4 rounded-lg border-2 border-green-200">
+                            <p class="text-sm text-green-700 mb-1 font-medium">Économies annuelles</p>
+                            <p class="text-3xl font-bold text-green-800">
+                                {{ simulation.resultat.economie_annuelle_optimise|floatformat:0 }} €
+                            </p>
+                            <p class="text-xs text-green-600 mt-1 font-medium">par an</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Gain potentiel -->
+            <div class="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-6 border-l-4 border-yellow-500 shadow-md">
+                <h3 class="text-2xl font-bold text-yellow-900 mb-6 flex items-center">
+                    <i class="fas fa-trophy text-yellow-600 text-2xl mr-3"></i>
+                    Gain potentiel avec l'optimisation
+                </h3>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="text-center bg-white rounded-lg p-4 shadow">
+                        <p class="text-3xl font-bold text-yellow-700">
+                            +{{ simulation.resultat.gain_autoconso_kwh|floatformat:0 }}
+                        </p>
+                        <p class="text-sm text-gray-600 mt-1">kWh autoconsommés/an</p>
+                    </div>
+                    <div class="text-center bg-white rounded-lg p-4 shadow">
+                        <p class="text-3xl font-bold text-yellow-700">
+                            +{{ simulation.resultat.gain_autoconso_pct|floatformat:1 }}%
+                        </p>
+                        <p class="text-sm text-gray-600 mt-1">d'autoconsommation</p>
+                    </div>
+                    <div class="text-center bg-white rounded-lg p-4 shadow">
+                        <p class="text-3xl font-bold text-orange-600">
+                            +{{ simulation.resultat.gain_economie_annuel|floatformat:0 }} €
+                        </p>
+                        <p class="text-sm text-gray-600 mt-1">d'économies/an</p>
+                    </div>
+                    <div class="text-center bg-white rounded-lg p-4 shadow">
+                        <p class="text-3xl font-bold text-orange-600">
+                            +{{ simulation.resultat.gain_economie_25ans|floatformat:0 }} €
+                        </p>
+                        <p class="text-sm text-gray-600 mt-1">sur 25 ans</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Comment optimiser -->
+            <div class="mt-6 bg-blue-50 rounded-xl p-6 border-2 border-blue-200">
+                <h4 class="font-bold text-blue-900 mb-3 flex items-center text-lg">
+                    <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+                    Comment optimiser votre installation ?
+                </h4>
+                <div class="text-sm text-blue-800 leading-relaxed space-y-2">
+                    <p>
+                        <strong>Pour maximiser votre autoconsommation solaire</strong>, programmez vos appareils électriques 
+                        pour qu'ils fonctionnent pendant les heures de production solaire, 
+                        généralement entre <strong class="text-blue-900">11h et 16h</strong>.
+                    </p>
+                    <p class="font-medium mt-3">⚡ Appareils à optimiser :</p>
+                    <ul class="list-disc list-inside pl-4 space-y-1">
+                        <li>Lave-linge et lave-vaisselle (départ différé)</li>
+                        <li>Chauffe-eau thermodynamique (programmation horaire)</li>
+                        <li>Véhicule électrique (charge diurne)</li>
+                        <li>Pompe de piscine (filtration en journée)</li>
+                    </ul>
+                    <p class="mt-3">
+                        💡 <strong>Astuce :</strong> Utilisez des prises programmables ou les fonctions "départ différé" 
+                        de vos appareils pour automatiser ce processus.
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        <!-- ✅ FIN NOUVELLE SECTION ✅ -->
+
         <!-- Graphique 1 : Production vs Consommation Mensuelle -->
         <div class="chart-container">
             <h2 class="text-2xl font-bold mb-4 flex items-center">
