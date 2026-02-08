@@ -24,7 +24,7 @@ def generate_personalized_hourly_profile(profil, decomposition, optimized=False)
     Returns:
         np.array: Profile horaire (8760 valeurs en kWh)
     """
-    from solar_calc.consumption_profiles import ConsumptionProfiles
+    from solar_calc.services.consumption_profiles import ConsumptionProfiles
     
     mode = "OPTIMISÉ" if optimized else "ACTUEL"
     logger.info(f"🔧 Génération profil {mode} pour {profil.nom}")

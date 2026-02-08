@@ -5,12 +5,6 @@ import numpy as np
 
 from frontend.models import Simulation, Resultat
 from weather.services.pvgis import get_pvgis_weather_data
-# TODO: Ces imports sont désactivés car les classes n'existent pas encore
-# from solar_calc.services import (
-#     ConfigurationOptimizer,
-#     ObjectifSimulation,
-#     ModeSimulation
-# )
 from solar_calc.services.consumption_profiles import ConsumptionProfiles
 from solar_calc.consumption_decomposer import decompose_consumption, get_decomposition_summary
 from solar_calc.hourly_pattern_generator import generate_personalized_hourly_profile
@@ -102,7 +96,7 @@ def run_simulation_task(self, simulation_id):
             optimized=True
         )
 
-        # 5. UTILISER LE PROFIL ACTUEL POUR LES CALCULS (pour compatibilité)
+        # 5. UTILISER LE PROFIL ACTUEL POUR LES CALCULS
         consommation_horaire = consommation_actuel
         consommation_annuelle = profil.consommation_annuelle_kwh
         
@@ -112,65 +106,49 @@ def run_simulation_task(self, simulation_id):
             meta={'percentage': 80, 'message': '🔍 Optimisation configuration...'}
         )
         
-        # ====================================================================
-        # TODO: OPTIMISATION DÉSACTIVÉE TEMPORAIREMENT
-        # Les classes ConfigurationOptimizer, ObjectifSimulation et ModeSimulation
-        # n'existent pas encore. À implémenter plus tard.
-        # ====================================================================
-        
         logger.warning("⚠️ Optimisation avancée non disponible - utilisation config par défaut")
         
-        # Configuration par défaut (sans optimisation avancée)
-        # On utilise directement les paramètres de l'installation
+        # Configuration par défaut
         puissance_kwc = installation.puissance_kw  
         orientation = installation.orientation  
         inclinaison = installation.inclinaison 
         
         # Calculer la production avec la puissance installée
         production_horaire = production_1kwc * puissance_kwc
-        production_annuelle = production_horaire.sum()
+        production_annuelle = float(production_horaire.sum())
         
-        # ========== CALCULER AUTOCONSOMMATION POUR LES DEUX SCÉNARIOS ==========
+        # ========== AUTOCONSOMMATION DEUX SCÉNARIOS ==========
 
-        # SCÉNARIO ACTUEL (horaires habituels)
+        # SCÉNARIO ACTUEL
         autoconso_actuel_horaire = np.minimum(production_horaire, consommation_actuel)
-        autoconso_actuel_kwh = autoconso_actuel_horaire.sum()
+        autoconso_actuel_kwh = float(autoconso_actuel_horaire.sum())
         autoconso_actuel_ratio = (autoconso_actuel_kwh / production_annuelle * 100) if production_annuelle > 0 else 0
-
         injection_actuel_kwh = production_annuelle - autoconso_actuel_kwh
         autoproduction_actuel_ratio = (autoconso_actuel_kwh / consommation_annuelle * 100) if consommation_annuelle > 0 else 0
 
-        # SCÉNARIO OPTIMISÉ (heures solaires)
+        # SCÉNARIO OPTIMISÉ
         autoconso_optimise_horaire = np.minimum(production_horaire, consommation_optimise)
-        autoconso_optimise_kwh = autoconso_optimise_horaire.sum()
+        autoconso_optimise_kwh = float(autoconso_optimise_horaire.sum())
         autoconso_optimise_ratio = (autoconso_optimise_kwh / production_annuelle * 100) if production_annuelle > 0 else 0
-
         injection_optimise_kwh = production_annuelle - autoconso_optimise_kwh
         autoproduction_optimise_ratio = (autoconso_optimise_kwh / consommation_annuelle * 100) if consommation_annuelle > 0 else 0
 
-        # ========== CALCULER LES ÉCONOMIES POUR LES DEUX SCÉNARIOS ==========
+        # ========== TARIFS ==========
 
-        # ========== TARIFS FÉVRIER 2026 ==========
-
-        # Tarif achat réseau 
-        TARIF_ACHAT_KWH = 0.1940  # €/kWh TTC - Tarif réglementé Base EDF
-
-        # Tarif injection EDF OA selon puissance installation (Arrêté S21 - T1 2026)
-        puissance_kwc = config_optimale.puissance_kwc  # ou installation.puissance_kw
+        TARIF_ACHAT_KWH = 0.1940
 
         if puissance_kwc <= 9:
-            TARIF_INJECTION_KWH = 0.04    # €/kWh - Résidentiel ≤9 kWc
+            TARIF_INJECTION_KWH = 0.04
             logger.info(f"💰 Tarif injection : 0,04 €/kWh (≤9 kWc)")
         elif puissance_kwc <= 36:
-            TARIF_INJECTION_KWH = 0.0617  # €/kWh - 9-36 kWc
+            TARIF_INJECTION_KWH = 0.0617
             logger.info(f"💰 Tarif injection : 0,0617 €/kWh (9-36 kWc)")
         elif puissance_kwc <= 100:
-            TARIF_INJECTION_KWH = 0.0617  # €/kWh - 36-100 kWc
+            TARIF_INJECTION_KWH = 0.0617
             logger.info(f"💰 Tarif injection : 0,0617 €/kWh (36-100 kWc)")
         else:
-            # > 100 kWc : Appel d'offres (pas couvert par ce simulateur)
-            TARIF_INJECTION_KWH = 0.0536  # €/kWh - Estimation (à vérifier)
-            logger.warning(f"⚠️ Installation >100 kWc : tarif injection estimatif (AOS requis)")
+            TARIF_INJECTION_KWH = 0.0536
+            logger.warning(f"⚠️ Installation >100 kWc : tarif injection estimatif")
 
         # Économies ACTUEL
         economie_autoconso_actuel = autoconso_actuel_kwh * TARIF_ACHAT_KWH
@@ -182,67 +160,59 @@ def run_simulation_task(self, simulation_id):
         revenu_injection_optimise = injection_optimise_kwh * TARIF_INJECTION_KWH
         economie_totale_optimise = economie_autoconso_optimise + revenu_injection_optimise
 
-        # ========== CALCULER LES GAINS ==========
-
+        # ========== GAINS ==========
         gain_autoconso_kwh = autoconso_optimise_kwh - autoconso_actuel_kwh
         gain_autoconso_pct = autoconso_optimise_ratio - autoconso_actuel_ratio
         gain_economie_annuel = economie_totale_optimise - economie_totale_actuel
         gain_economie_25ans = gain_economie_annuel * 25
 
-        # ========== LOGS RÉSULTATS COMPARATIFS ==========
-
+        # ========== LOGS ==========
         logger.info("\n" + "="*80)
         logger.info("📊 RÉSULTATS COMPARATIFS")
         logger.info("="*80)
-        logger.info(f"SCÉNARIO ACTUEL (horaires habituels) :")
+        logger.info(f"SCÉNARIO ACTUEL :")
         logger.info(f"  • Autoconsommation : {autoconso_actuel_kwh:.0f} kWh ({autoconso_actuel_ratio:.1f}%)")
+        logger.info(f"  • Autoproduction : {autoproduction_actuel_ratio:.1f}%")
         logger.info(f"  • Injection réseau : {injection_actuel_kwh:.0f} kWh")
         logger.info(f"  • Économies totales : {economie_totale_actuel:.0f} €/an")
-        logger.info(f"")
-        logger.info(f"⚡ SCÉNARIO OPTIMISÉ (heures solaires) :")
+        logger.info(f"⚡ SCÉNARIO OPTIMISÉ :")
         logger.info(f"  • Autoconsommation : {autoconso_optimise_kwh:.0f} kWh ({autoconso_optimise_ratio:.1f}%)")
         logger.info(f"  • Injection réseau : {injection_optimise_kwh:.0f} kWh")
         logger.info(f"  • Économies totales : {economie_totale_optimise:.0f} €/an")
-        logger.info(f"")
-        logger.info(f"💰 GAIN POTENTIEL AVEC OPTIMISATION :")
-        logger.info(f"  • +{gain_autoconso_kwh:.0f} kWh autoconsommés (+{gain_autoconso_pct:.1f}%)")
-        logger.info(f"  • +{gain_economie_annuel:.0f} €/an")
-        logger.info(f"  • +{gain_economie_25ans:.0f} € sur 25 ans")
+        logger.info(f"💰 GAIN : +{gain_autoconso_kwh:.0f} kWh | +{gain_economie_annuel:.0f} €/an")
         logger.info("="*80 + "\n")
 
-        # Compatibilité avec le reste du code (variables utilisées plus bas)
-        autoconso_kwh = autoconso_actuel_kwh
-        autoconso_ratio = autoconso_actuel_ratio
-        injection_kwh = injection_actuel_kwh
-        autoproduction_kwh = autoconso_actuel_kwh
-        autoproduction_ratio = autoproduction_actuel_ratio
+        # ========== AGRÉGATION MENSUELLE (par mois, pas par jour) ==========
+        days_per_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        hours_per_month = [d * 24 for d in days_per_month]
+        
+        production_mensuelle = []
+        consommation_mensuelle = []
+        idx = 0
+        for h in hours_per_month:
+            if hasattr(production_horaire, 'iloc'):
+                prod_slice = production_horaire.iloc[idx:idx+h]
+            else:
+                prod_slice = production_horaire[idx:idx+h]
+            conso_slice = consommation_horaire[idx:idx+h]
+            
+            production_mensuelle.append(round(float(np.sum(prod_slice)), 1))
+            consommation_mensuelle.append(round(float(np.sum(conso_slice)), 1))
+            idx += h
+        
+        logger.info(f"📊 Production mensuelle: {production_mensuelle}")
+        logger.info(f"📊 Consommation mensuelle: {consommation_mensuelle}")
+        
+        # ========== PROFIL HORAIRE MOYEN (24h) ==========
+        prod_array = production_horaire.values if hasattr(production_horaire, 'values') else np.array(production_horaire)
+        production_horaire_moy = prod_array[:8760].reshape(365, 24).mean(axis=0).tolist()
+        consommation_horaire_moy = consommation_horaire[:8760].reshape(365, 24).mean(axis=0).tolist()
+        
+        logger.info(f"📊 Profil horaire prod: pic={max(production_horaire_moy):.2f} kW à {production_horaire_moy.index(max(production_horaire_moy))}h")
+        logger.info(f"📊 Profil horaire conso: pic={max(consommation_horaire_moy):.2f} kW à {consommation_horaire_moy.index(max(consommation_horaire_moy))}h")
+
         economie_annuelle = economie_totale_actuel
-        economie_25ans = economie_totale_actuel * 25
-        
-        # Économies (calcul simple)
-        prix_kwh_autoconso = 0.2516  # Prix évité
-        prix_kwh_injection = 0.04    # Prix revente
-        economie_annuelle = (autoconso_kwh * prix_kwh_autoconso) + (injection_kwh * prix_kwh_injection)
         economie_25ans = economie_annuelle * 25
-        
-        # Créer un objet config_optimale compatible avec le reste du code
-        class SimpleConfig:
-            def __init__(self):
-                self.puissance_kwc = puissance_kwc
-                self.economie_annuelle_euros = economie_annuelle
-                self.economie_25ans_euros = economie_25ans
-                # Résultats
-                self.results = type('obj', (object,), {
-                    'production_annuelle_kwh': production_annuelle,
-                    'production_mensuelle_kwh': production_horaire.values.reshape(365, 24).sum(axis=1).tolist()[:12],
-                    'consommation_annuelle_kwh': consommation_annuelle,
-                    'consommation_mensuelle_kwh': consommation_horaire.reshape(365, 24).sum(axis=1).tolist()[:12],
-                    'taux_autoconsommation_pct': autoconso_ratio,
-                    'taux_autoproduction_pct': autoproduction_ratio,
-                    'injection_reseau_kwh': injection_kwh,
-                })()
-        
-        config_optimale = SimpleConfig()
         objectif_str = getattr(installation, 'objectif', 'rentabilite')
         
         # === ÉTAPE 5: Sauvegarde (100%) ===
@@ -251,56 +221,50 @@ def run_simulation_task(self, simulation_id):
             meta={'percentage': 100, 'message': '💾 Sauvegarde résultats...'}
         )
         
-        results = config_optimale.results
-        
         resultat = Resultat.objects.create(
             # Production
-            production_annuelle_kwh=results.production_annuelle_kwh,
-            production_mensuelle_kwh=results.production_mensuelle_kwh,
-            production_horaire_kwh=[],
+            production_annuelle_kwh=production_annuelle,
+            production_mensuelle_kwh=production_mensuelle,
+            production_horaire_kwh=[round(x, 3) for x in production_horaire_moy],
             
             # Consommation
-            consommation_annuelle_kwh=results.consommation_annuelle_kwh,
-            consommation_mensuelle_kwh=results.consommation_mensuelle_kwh,
-            consommation_horaire_kwh=[],
+            consommation_annuelle_kwh=consommation_annuelle,
+            consommation_mensuelle_kwh=consommation_mensuelle,
+            consommation_horaire_kwh=[round(x, 3) for x in consommation_horaire_moy],
             
-            # ✅ SCÉNARIO ACTUEL
+            # SCÉNARIO ACTUEL
             autoconsommation_kwh_actuel=autoconso_actuel_kwh,
             autoconsommation_ratio_actuel=autoconso_actuel_ratio,
             economie_annuelle_actuel=economie_totale_actuel,
             
-            # ✅ SCÉNARIO OPTIMISÉ
+            # SCÉNARIO OPTIMISÉ
             autoconsommation_kwh_optimise=autoconso_optimise_kwh,
             autoconsommation_ratio_optimise=autoconso_optimise_ratio,
             economie_annuelle_optimise=economie_totale_optimise,
             
-            # ✅ GAINS
+            # GAINS
             gain_autoconso_kwh=gain_autoconso_kwh,
             gain_autoconso_pct=gain_autoconso_pct,
             gain_economie_annuel=gain_economie_annuel,
             gain_economie_25ans=gain_economie_25ans,
             
-            # Champs existants (compatibilité)
-            autoconsommation_ratio=autoconso_actuel_ratio,  # Pour compatibilité
+            # Champs compatibilité
+            autoconsommation_ratio=autoconso_actuel_ratio,
             taux_autoproduction_pct=autoproduction_actuel_ratio,
             injection_reseau_kwh=injection_actuel_kwh,
             economie_annuelle_euros=economie_totale_actuel,
             roi_25ans_euros=economie_25ans,
-            taux_rentabilite_pct=(economie_25ans / (config_optimale.puissance_kwc * 1800) * 100),
-            puissance_recommandee_kwc=config_optimale.puissance_kwc,
+            taux_rentabilite_pct=(economie_25ans / (puissance_kwc * 1800) * 100),
+            puissance_recommandee_kwc=puissance_kwc,
             objectif_optimisation=objectif_str,
-
-            tarif_achat_kwh=TARIF_ACHAT_KWH,
-            tarif_injection_kwh=TARIF_INJECTION_KWH,
         )
 
-        
         simulation.resultat = resultat
         simulation.status = 'success'
         simulation.completed_at = timezone.now()
         simulation.save()
         
-        logger.info(f"✅ Simulation {simulation_id} terminée - {config_optimale.puissance_kwc} kWc")
+        logger.info(f"✅ Simulation {simulation_id} terminée - {puissance_kwc} kWc")
         
         return {
             'percentage': 100,
