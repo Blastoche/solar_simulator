@@ -457,3 +457,64 @@ def get_pvgis_weather_data(
     
     return df, metadata
 
+# ===== FONCTION AVEC CONTRAT CLAIR =====
+
+def get_normalized_weather_data(
+    latitude: float,
+    longitude: float,
+    use_cache: bool = True
+) -> tuple:
+    """
+    Point d'entrée principal du module weather avec contrat garanti.
+    
+    CONTRAT GARANTI :
+        DataFrame :
+            - 8760 lignes exactement
+            - Colonnes : ['timestamp', 'ghi', 'dni', 'dhi', 'temperature', ...]
+            - timestamp : datetime normalisé (année courante)
+            - ghi : W/m² (>= 0)
+            - temperature : °C
+            - Pas de valeurs manquantes
+        
+        Metadata :
+            - source : 'api', 'cache', ou 'fallback'
+            - irradiation_annuelle : kWh/m²/an
+            - api_version : 'PVGIS 5.3'
+    
+    Args:
+        latitude: Latitude (-90 à 90)
+        longitude: Longitude (-180 à 180)
+        use_cache: Utiliser le cache Redis
+    
+    Returns:
+        tuple: (DataFrame 8760h, WeatherMetadata)
+    
+    Raises:
+        ValueError: Si coordonnées invalides
+        Exception: Si API et cache échouent
+    
+    Example:
+        >>> df, meta = get_normalized_weather_data(43.3, 5.37)
+        >>> print(len(df))  # 8760
+        >>> print(meta.irradiation_annuelle)  # 1707.5
+    """
+    from weather.contracts import validate_weather_dataframe, create_weather_metadata
+    
+    # Appeler la fonction existante
+    df, meta_dict = get_pvgis_weather_data(latitude, longitude, use_cache)
+    
+    # Valider le contrat
+    validate_weather_dataframe(df)
+    
+    # Créer métadonnées structurées
+    metadata = create_weather_metadata(
+        source=meta_dict.get('source', 'unknown'),
+        df=df,
+        latitude=latitude,
+        longitude=longitude,
+        api_version="PVGIS 5.3",
+        retrieved_at=meta_dict.get('retrieved_at'),
+        cached_until=meta_dict.get('cached_until')
+    )
+    
+    return df, metadata
