@@ -1,0 +1,486 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Rapport de Simulation Solaire</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #1e293b;
+        }
+        
+        /* PAGE DE GARDE */
+        .cover-page {
+            page-break-after: always;
+            height: 24cm;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+            padding: 5cm 2cm;
+        }
+        
+        .cover-logo { font-size: 48pt; font-weight: bold; margin-bottom: 2cm; }
+        .cover-title { font-size: 32pt; font-weight: 600; margin-bottom: 1cm; }
+        .cover-subtitle { font-size: 18pt; opacity: 0.9; margin-bottom: 3cm; }
+        .cover-info { font-size: 14pt; opacity: 0.8; }
+        
+        /* TITRES */
+        h1 {
+            font-size: 24pt;
+            color: #667eea;
+            margin-top: 1cm;
+            margin-bottom: 0.5cm;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 0.3cm;
+            page-break-after: avoid;
+        }
+        
+        h2 {
+            font-size: 18pt;
+            color: #4f46e5;
+            margin-top: 0.8cm;
+            margin-bottom: 0.4cm;
+            page-break-after: avoid;
+        }
+        
+        h3 {
+            font-size: 14pt;
+            color: #6366f1;
+            margin-top: 0.5cm;
+            margin-bottom: 0.3cm;
+        }
+        
+        /* SECTIONS */
+        .section {
+            margin-bottom: 1cm;
+            page-break-inside: avoid;
+        }
+        
+        .page-break { page-break-before: always; }
+        
+        /* MÉTRIQUES */
+        .metric-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5cm;
+            margin: 0.5cm 0;
+        }
+        
+        .metric-grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 0.4cm;
+            margin: 0.5cm 0;
+        }
+        
+        .metric-box {
+            background: #f8fafc;
+            border-left: 4px solid #667eea;
+            padding: 0.4cm;
+        }
+        
+        .metric-label {
+            font-size: 10pt;
+            color: #64748b;
+            text-transform: uppercase;
+        }
+        
+        .metric-value {
+            font-size: 20pt;
+            font-weight: 700;
+            color: #1e293b;
+            margin-top: 0.2cm;
+        }
+        
+        .metric-unit { font-size: 12pt; color: #64748b; }
+        
+        /* TABLEAUX */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0.5cm 0;
+        }
+        
+        th {
+            background: #667eea;
+            color: white;
+            padding: 0.3cm;
+            text-align: left;
+            font-size: 10pt;
+        }
+        
+        td {
+            padding: 0.3cm;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 10pt;
+        }
+        
+        tr:nth-child(even) { background: #f8fafc; }
+        
+        /* ALERTES */
+        .alert {
+            padding: 0.4cm;
+            border-radius: 6px;
+            margin: 0.5cm 0;
+            page-break-inside: avoid;
+        }
+        
+        .alert-info {
+            background: #dbeafe;
+            border-left: 4px solid #3b82f6;
+            color: #1e40af;
+        }
+        
+        .alert-success {
+            background: #dcfce7;
+            border-left: 4px solid #22c55e;
+            color: #166534;
+        }
+        
+        .alert-eco {
+            background: #d1fae5;
+            border-left: 4px solid #10b981;
+            color: #065f46;
+        }
+        
+        /* GRAPHIQUES */
+        .chart-container {
+            margin: 0.5cm 0;
+            text-align: center;
+            page-break-inside: avoid;
+        }
+        
+        .chart-container img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        /* BADGES */
+        .badge {
+            display: inline-block;
+            padding: 0.15cm 0.3cm;
+            border-radius: 4px;
+            font-size: 9pt;
+            font-weight: 600;
+            margin-right: 0.2cm;
+        }
+        
+        .badge-success { background: #dcfce7; color: #166534; }
+        .badge-info { background: #dbeafe; color: #1e40af; }
+        
+        /* FOOTER */
+        .footer {
+            margin-top: 1cm;
+            padding-top: 0.5cm;
+            border-top: 1px solid #e2e8f0;
+            font-size: 9pt;
+            color: #94a3b8;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    
+    <!-- PAGE DE GARDE -->
+    <div class="cover-page">
+        <div class="cover-logo">☀️ Solar Simulator</div>
+        <div class="cover-title">Rapport de Simulation Solaire</div>
+        <div class="cover-subtitle">{{ installation.adresse }}</div>
+        <div class="cover-info">
+            <p>Généré le {{ date_generation }}</p>
+            <p style="margin-top: 0.5cm;">Installation {{ installation.puissance_kwc }} kWc</p>
+        </div>
+    </div>
+    
+    <!-- RÉSUMÉ EXÉCUTIF -->
+    <h1>📊 Résumé Exécutif</h1>
+    
+    <div class="section">
+        <div class="metric-grid">
+            <div class="metric-box">
+                <div class="metric-label">Production Annuelle</div>
+                <div class="metric-value">{{ production.annuelle|floatformat:0 }} <span class="metric-unit">kWh</span></div>
+            </div>
+            
+            <div class="metric-box">
+                <div class="metric-label">Économies An 1</div>
+                <div class="metric-value">{{ financier_avance.economie_an1|floatformat:0 }} <span class="metric-unit">€</span></div>
+            </div>
+            
+            <div class="metric-box">
+                <div class="metric-label">Taux d'Autoconsommation</div>
+                <div class="metric-value">{{ autoconsommation.ratio|floatformat:1 }} <span class="metric-unit">%</span></div>
+            </div>
+            
+            <div class="metric-box">
+                <div class="metric-label">Retour sur Investissement</div>
+                <div class="metric-value">{{ financier_avance.payback_years|floatformat:1 }} <span class="metric-unit">ans</span></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="alert alert-success">
+        <strong>✅ Installation viable et rentable</strong><br>
+        Sur 25 ans, vous économiserez <strong>{{ financier_avance.economie_totale|floatformat:0 }}€</strong> 
+        pour un investissement net de <strong>{{ financier_avance.investissement_net|floatformat:0 }}€</strong> 
+        (après prime de {{ financier_avance.prime_autoconso|floatformat:0 }}€).
+    </div>
+    
+    <!-- IMPACT ENVIRONNEMENTAL -->
+    <div class="section">
+        <h2>🌍 Impact Environnemental</h2>
+        <div class="metric-grid-3">
+            <div class="metric-box" style="border-left-color: #10b981;">
+                <div class="metric-label">CO2 Évité (25 ans)</div>
+                <div class="metric-value" style="font-size: 18pt;">{{ co2.total_tonnes }} <span class="metric-unit">tonnes</span></div>
+            </div>
+            
+            <div class="metric-box" style="border-left-color: #10b981;">
+                <div class="metric-label">Équivalent Voiture</div>
+                <div class="metric-value" style="font-size: 18pt;">{{ co2.km_voiture|floatformat:0 }} <span class="metric-unit">km</span></div>
+            </div>
+            
+            <div class="metric-box" style="border-left-color: #10b981;">
+                <div class="metric-label">Équivalent Arbres</div>
+                <div class="metric-value" style="font-size: 18pt;">{{ co2.arbres|floatformat:0 }} <span class="metric-unit">arbres</span></div>
+            </div>
+        </div>
+        
+        <div class="alert alert-eco">
+            <strong>🌱 Impact positif</strong><br>
+            Chaque année, votre installation solaire évite l'émission de <strong>{{ co2.annuel_kg }} kg de CO2</strong>, 
+            soit l'équivalent de {{ co2.km_voiture|floatformat:0 }} km en voiture sur 25 ans !
+        </div>
+    </div>
+    
+    <!-- GRAPHIQUES -->
+    <div class="page-break"></div>
+    <h1>📈 Analyses Graphiques</h1>
+    
+    {% if charts.monthly_production %}
+    <div class="section">
+        <h2>Production Mensuelle</h2>
+        <div class="chart-container">
+            <img src="{{ charts.monthly_production }}" alt="Production mensuelle">
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if charts.prod_vs_conso %}
+    <div class="section">
+        <h2>Production vs Consommation</h2>
+        <div class="chart-container">
+            <img src="{{ charts.prod_vs_conso }}" alt="Production vs Consommation">
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if charts.bill_evolution %}
+    <div class="page-break"></div>
+    <h2>Évolution de la Facture Électrique (25 ans)</h2>
+    <div class="chart-container">
+        <img src="{{ charts.bill_evolution }}" alt="Évolution facture">
+    </div>
+    <p style="text-align: center; color: #64748b; font-size: 10pt; margin-top: 0.3cm;">
+        <em>Hypothèse : inflation électricité +3%/an</em>
+    </p>
+    {% endif %}
+    
+    {% if charts.roi_evolution %}
+    <div class="section">
+        <h2>Retour sur Investissement</h2>
+        <div class="chart-container">
+            <img src="{{ charts.roi_evolution }}" alt="ROI évolution">
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- PROJECTION FINANCIÈRE -->
+    <div class="page-break"></div>
+    <h1>💰 Projection Financière Détaillée</h1>
+    
+    <div class="section">
+        <h2>Investissement Initial</h2>
+        <table>
+            <tr>
+                <th>Poste</th>
+                <th style="text-align: right;">Montant</th>
+            </tr>
+            <tr>
+                <td>Coût installation ({{ installation.puissance_kwc }} kWc × 1800€)</td>
+                <td style="text-align: right;"><strong>{{ financier_avance.cout_installation|floatformat:0 }} €</strong></td>
+            </tr>
+            <tr>
+                <td>Prime à l'autoconsommation</td>
+                <td style="text-align: right; color: #10b981;"><strong>- {{ financier_avance.prime_autoconso|floatformat:0 }} €</strong></td>
+            </tr>
+            <tr style="background: #f1f5f9; font-weight: bold;">
+                <td>Investissement net</td>
+                <td style="text-align: right;">{{ financier_avance.investissement_net|floatformat:0 }} €</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div class="section">
+        <h2>Projection sur 25 ans</h2>
+        <table>
+            <tr>
+                <th>Année</th>
+                <th style="text-align: right;">Sans Solaire</th>
+                <th style="text-align: right;">Avec Solaire</th>
+                <th style="text-align: right;">Surplus Vendu</th>
+                <th style="text-align: right;">Économies</th>
+                <th style="text-align: right;">Cumul</th>
+                <th style="text-align: center;">État</th>
+            </tr>
+            {% for proj in projection_table %}
+            <tr>
+                <td><strong>An {{ proj.annee }}</strong></td>
+                <td style="text-align: right;">{{ proj.facture_sans|floatformat:0 }} €</td>
+                <td style="text-align: right;">{{ proj.facture_avec|floatformat:0 }} €</td>
+                <td style="text-align: right; color: #10b981;">
+                    {% if proj.annee <= 20 %}
+                        +{{ proj.surplus|floatformat:0 }} €
+                    {% else %}
+                        <span style="color: #94a3b8;">-</span>
+                    {% endif %}
+                </td>
+                <td style="text-align: right; color: #10b981;">+{{ proj.economie|floatformat:0 }} €</td>
+                <td style="text-align: right; font-weight: bold;">{{ proj.cumul|floatformat:0 }} €</td>
+                <td style="text-align: center; font-size: 14pt;">
+                    {% if proj.status == '✅' %}
+                        <span style="color: #10b981;">✅</span>
+                    {% else %}
+                        <span style="color: #d97706;">⏳</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+        
+        <div class="alert alert-info" style="margin-top: 0.5cm;">
+            <strong>💡 Détails du calcul</strong><br>
+            • Prix électricité : 0.2516€/kWh TTC (tarif réglementé base 2025)<br>
+            • Inflation : +3% par an<br>
+            • TURPE : Part fixe annuelle (selon puissance)<br>
+            • Rachat surplus : 0.04€/kWh (contrat 20 ans pour ≤9kWc)<br>
+            • <span style="color: #d97706;">⏳</span> = En cours d'amortissement &nbsp;&nbsp; <span style="color: #10b981;">✅</span> = Amorti
+        </div>
+    </div>
+    
+    <!-- CONFIGURATION TECHNIQUE -->
+    <div class="page-break"></div>
+    <h1>⚙️ Configuration Technique</h1>
+    
+    <div class="section">
+        <h2>Installation Solaire</h2>
+        <table>
+            <tr>
+                <th>Paramètre</th>
+                <th>Valeur</th>
+            </tr>
+            <tr>
+                <td>Puissance installée</td>
+                <td><strong>{{ installation.puissance_kwc }} kWc</strong></td>
+            </tr>
+            <tr>
+                <td>Orientation</td>
+                <td>{{ installation.orientation }}</td>
+            </tr>
+            <tr>
+                <td>Inclinaison</td>
+                <td>{{ installation.inclinaison }}</td>
+            </tr>
+            <tr>
+                <td>Localisation</td>
+                <td style="vertical-align: middle;">{{ installation.adresse }}</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div class="section">
+        <h2>Performance Énergétique</h2>
+        <table>
+            <tr>
+                <th>Métrique</th>
+                <th>Valeur</th>
+            </tr>
+            <tr>
+                <td>Production annuelle</td>
+                <td><strong>{{ production.annuelle|floatformat:0 }} kWh</strong></td>
+            </tr>
+            <tr>
+                <td>Production spécifique</td>
+                <td>{{ production.specifique|floatformat:0 }} kWh/kWc</td>
+            </tr>
+            <tr>
+                <td>Consommation annuelle</td>
+                <td>{{ consommation.annuelle|floatformat:0 }} kWh</td>
+            </tr>
+            <tr>
+                <td>Énergie autoconsommée</td>
+                <td>{{ autoconsommation.energie|floatformat:0 }} kWh ({{ autoconsommation.ratio|floatformat:1 }}%)</td>
+            </tr>
+            <tr>
+                <td>Surplus injecté</td>
+                <td>{{ autoconsommation.injection|floatformat:0 }} kWh</td>
+            </tr>
+        </table>
+    </div>
+    
+    <!-- RECOMMANDATIONS -->
+    <div class="page-break"></div>
+    <h1>💡 Recommandations</h1>
+    
+    <div class="section">
+        <h2>Optimisations Possibles</h2>
+        
+        <p><strong>✓ Installation bien dimensionnée</strong></p>
+        <p>Avec un taux d'autoconsommation de {{ autoconsommation.ratio|floatformat:0 }}%, votre installation est bien adaptée à votre consommation.</p>
+        
+        {% if batterie %}
+        <div class="alert alert-success" style="margin-top: 0.5cm;">
+            <strong>🔋 Batterie recommandée</strong><br>
+            L'ajout d'une batterie de {{ batterie.capacite }} kWh pourrait augmenter votre autonomie à {{ batterie.autonomie }} jours
+            et optimiser davantage votre autoconsommation.
+        </div>
+        {% endif %}
+        
+        <h3 style="margin-top: 0.8cm;">Conseils d'Utilisation</h3>
+        <ul style="margin-left: 1cm; margin-top: 0.3cm; list-style: disc;">
+            <li style="margin-bottom: 0.2cm;">Privilégiez l'utilisation des appareils énergivores en journée (lave-linge, lave-vaisselle)</li>
+            <li style="margin-bottom: 0.2cm;">Surveillez régulièrement la production via le monitoring</li>
+            <li style="margin-bottom: 0.2cm;">Entretenez les panneaux (nettoyage annuel recommandé)</li>
+            <li style="margin-bottom: 0.2cm;">Vérifiez l'onduleur régulièrement</li>
+        </ul>
+        
+        <h3 style="margin-top: 0.8cm;">Pour Aller Plus Loin</h3>
+        <p style="margin-top: 0.3cm;">
+            Pour maximiser vos économies, envisagez :
+        </p>
+        <ul style="margin-left: 1cm; margin-top: 0.3cm; list-style: disc;">
+            <li style="margin-bottom: 0.2cm;">Un système de programmation intelligent pour vos appareils</li>
+            <li style="margin-bottom: 0.2cm;">Un chauffe-eau solaire pour optimiser l'utilisation de l'énergie</li>
+            <li style="margin-bottom: 0.2cm;">Une borne de recharge pour véhicule électrique</li>
+        </ul>
+    </div>
+    
+    <!-- FOOTER -->
+    <div class="footer">
+        <p>Solar Simulator - Rapport généré le {{ date_generation }}</p>
+        <p style="margin-top: 0.2cm;">Ce document est une simulation basée sur des données météorologiques historiques (PVGIS 5.3) et ne constitue pas un engagement contractuel.</p>
+        <p style="margin-top: 0.2cm;">Les résultats réels peuvent varier selon de nombreux facteurs (ombrage, maintenance, évolution météo, qualité des équipements).</p>
+    </div>
+    
+</body>
+</html>
