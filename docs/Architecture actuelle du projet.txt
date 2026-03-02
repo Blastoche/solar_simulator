@@ -1,198 +1,326 @@
+================================================================================
+  SOLAR SIMULATOR — ARCHITECTURE ACTUELLE DU PROJET
+  Dernière mise à jour : Février 2026
+================================================================================
+
+
 solar_simulator/
 │
-├── 📄 manage.py                          # Point d'entrée Django
-├── 📄 requirements.txt                   # Dépendances production
-├── 📄 requirements-dev.txt               # Dépendances développement
-├── 📄 .env.example                       # Template variables d'environnement
-├── 📄 .env                               # Variables d'environnement (local)
-├── 📄 .gitignore                         # Fichiers ignorés git
-├── 📄 README.md                          # Documentation principale
+├── 📄 manage.py                                # Point d'entrée Django
+├── 📄 requirements.txt                         # Dépendances production (~25 packages)
+├── 📄 requirements-dev.txt                     # Dépendances développement
+├── 📄 README.md                                # Documentation principale
+├── 📄 PVGIS_5.3_MIGRATION.md                   # Notes migration PVGIS v5.2 → v5.3
+├── 📄 setup_windows.bat                        # Script d'installation Windows
+├── 📄 db.sqlite3                               # Base de données SQLite (développement)
 │
-├── 📂 config/                            # 🔧 CONFIGURATION DJANGO
+│
+├── 📂 config/                                  # 🔧 CONFIGURATION DJANGO
 │   ├── __init__.py
-│   ├── settings.py                       # Configuration globale
-│   ├── urls.py                           # Routage principal
-│   ├── wsgi.py                           # Déploiement WSGI
-│   └── asgi.py                           # Déploiement ASGI
-│
-├── 📂 docs/                              # 📚 DOCUMENTATION
-│   ├── structure.py
-│   ├── architecture.py
-│   ├── etat_simulateur.md
-│   └── guide_windows.md
-│
-├── 📂 static/                            # 🎨 ASSETS GLOBAUX
-│   ├── css/
-│   ├── js/
-│   └── images/
-│
-├── 📂 media/                             # 📁 UPLOADS UTILISATEURS (créé auto)
-│
-├── 📂 reports_output/                    # 📄 RAPPORTS PDF (créé auto)
-│
-├── 📂 logs/                              # 📋 LOGS (créé auto)
+│   ├── settings.py                             # Settings (SQLite dev, Redis, Celery, 7 apps)
+│   ├── celery.py                               # Configuration Celery (broker Redis)
+│   ├── urls.py                                 # Routage principal → frontend + reporting
+│   ├── wsgi.py
+│   └── asgi.py
 │
 │
-├── 📂 core/                              # ⚙️ APP CORE - Utilitaires
-│   ├── __init__.py
-│   ├── models.py
-│   ├── admin.py
-│   ├── apps.py
-│   ├── management/
-│   │   ├── __init__.py
-│   │   └── commands/                     # Commandes Django custom
-│   ├── migrations/
+├── 📂 docs/                                    # 📚 DOCUMENTATION
+│   ├── Architecture actuelle du projet.txt     # ← CE FICHIER
+│   ├── Architecture Détaillée du Simulateur Solaire.py
+│   ├── Structure.py                            # Structure théorique des modules
+│   ├── etat_simulateur.md                      # Journal d'état du simulateur
+│   ├── Guide_windows.md                        # Guide d'installation Windows
+│   └── API_CONTRACTS.md                        # Contrats d'API entre modules
+│
+│
+├── 📂 logs/                                    # 📋 LOGS
+│   └── django.log
+│
+│
+├── 📂 core/                                    # ⚙️ APP CORE — Utilitaires transverses
+│   ├── validators.py                           # Validators GPS, paramètres techniques
+│   ├── management/commands/                    # Commandes Django custom
 │   └── tests/
 │
 │
-├── 📂 weather/                           # 🌤️ APP WEATHER - Données météo
-│   ├── __init__.py
-│   ├── models.py                         # Modèles BD (cache données API)
+├── 📂 weather/                                 # 🌤️ APP WEATHER — Données météo
+│   ├── models.py                               # WeatherData, SolarRadiation, APICache (281 lignes)
 │   ├── admin.py
-│   ├── apps.py
+│   ├── contracts.py                            # Contrats d'interface
 │   ├── services/
-│   │   ├── __init__.py
-│   │   ├── pvgis.py                      # Client API PVGIS (irradiation)
-│   │   └── openweather.py                # Client OpenWeatherMap
-│   ├── templates/
-│   │   └── weather/
+│   │   ├── pvgis.py                            # ✅ Client PVGIS 5.3 — get_pvgis_weather_data()
+│   │   │                                       #    → Retourne DataFrame 8760h (GHI, température, vent)
+│   │   │                                       #    → Cache Redis automatique
+│   │   │                                       #    → Normalisation timestamps TMY
+│   │   └── chunks/pvgis_part_*.py              # Code splitté (contraintes taille fichier)
 │   ├── migrations/
 │   └── tests/
 │
 │
-├── 📂 solar_calc/                        # ☀️ APP SOLAR_CALC - Cœur métier
-│   ├── __init__.py
-│   ├── models.py                         # Modèles Django ORM (persistance)
-│   ├── admin.py
-│   ├── apps.py
+├── 📂 solar_calc/                              # ☀️ APP SOLAR_CALC — Cœur métier calculs
 │   │
-│   ├── dataclasses/                      # 📊 MODÈLES DE CALCUL (logique pure)
-│   │   ├── __init__.py
-│   │   ├── consumption.py                # Profils consommation électrique
-│   │   │   ├── ConsumptionProfile       # Classe pour calculs
-│   │   │   └── [méthodes de calcul]
+│   ├── models.py                               # ConsumptionProfileModel (309 lignes)
+│   │                                           #   → Profil logement complet :
+│   │                                           #     surface, DPE, chauffage, ECS,
+│   │                                           #     profil occupation, appareils (JSON)
+│   │                                           # ConsommationCalculee
+│   │                                           #   → Résultat calculateur consommation
+│   │
+│   ├── admin.py                                # Admin ConsumptionProfile + ConsommationCalculee
+│   ├── contracts.py                            # Contrats d'interface
+│   │
+│   ├── tasks.py                                # ✅ TÂCHE CELERY — run_simulation_task()
+│   │                                           #   → Étape 1 : Données météo PVGIS (8760h)
+│   │                                           #   → Étape 2 : Production = GHI × 0.85 × correction temp
+│   │                                           #   → Étape 3 : Profils conso (actuel + optimisé)
+│   │                                           #   → Étape 4 : Autoconsommation = min(prod, conso) × 8760
+│   │                                           #   → Étape 5 : Agrégation mensuelle (12) + horaire (24h)
+│   │                                           #   → Sauvegarde Resultat
+│   │
+│   ├── consumption_decomposer.py               # ✅ Décomposition conso par poste
+│   │                                           #   → chauffage, ECS, cuisson, froid, lavage,
+│   │                                           #     éclairage, multimédia, divers
+│   │
+│   ├── hourly_pattern_generator.py             # ✅ Génération profil horaire personnalisé
+│   │                                           #   → 8760h basé sur profil occupation
+│   │                                           #   → Mode normal vs optimisé (heures solaires)
+│   │
+│   ├── dataclasses/                            # Modèles de calcul (logique pure Python)
+│   │   ├── consumption.py                      # Classes ConsumptionProfile, calculs
+│   │   └── production.py                       # Classes SolarInstallation, calculs
+│   │
+│   ├── services/                               # Services métier
+│   │   ├── calculator.py                       # Calculateur production solaire
+│   │   ├── consumption_calculator.py           # Calculateur consommation (rapide)
+│   │   ├── expert_consumption_calculator.py    # Calculateur consommation (expert)
+│   │   ├── consumption_profiles.py             # Profils type de consommation
+│   │   ├── hourly_calculator.py                # Calcul horaire avancé
+│   │   ├── simulation.py                       # Orchestrateur simulation
+│   │   └── chunks/                             # Code splitté (nombreux fichiers)
+│   │
+│   ├── frontend/                               # Vues/URLs spécifiques solar_calc
+│   │   ├── urls.py
+│   │   └── views.py
+│   │
+│   ├── migrations/
+│   └── tests/
+│
+│
+├── 📂 battery/                                 # 🔋 APP BATTERY — Stockage énergétique
+│   ├── models.py                               # BatterySystem, BatterySimulation (185 lignes)
+│   ├── admin.py
+│   ├── pricing.py                              # ✅ Prix batteries marché français 2025
+│   │                                           #   → Grille par capacité (2.5 → 15+ kWh)
+│   │                                           #   → Prix matériel + installation
+│   ├── services/
+│   │   ├── battery_simulation.py               # ✅ Simulation charge/décharge horaire
+│   │   └── sizing.py                           # ✅ Dimensionnement optimal
+│   │                                           #   → Compare capacités (2.5, 5, 10, 15 kWh)
+│   │                                           #   → Calcul ROI par capacité
+│   │                                           #   → Recommandation optimale
+│   ├── battery/                                # Sous-module (duplication historique)
+│   │   ├── services/
+│   │   ├── models.py
+│   │   └── pricing.py
+│   ├── migrations/
+│   └── tests/
+│
+│
+├── 📂 financial/                               # 💰 APP FINANCIAL — Analyses économiques
+│   ├── services/
+│   │   └── advanced_calculator.py              # 🔶 Calculateur financier (partiel)
+│   │                                           #   → ROI basique intégré dans tasks.py
+│   │                                           #   → VAN/TRI/LCOE : À implémenter
+│   └── tests/
+│
+│
+├── 📂 reporting/                               # 📊 APP REPORTING — Rapports & exports
+│   ├── views.py                                # ✅ download_pdf(), endpoints export
+│   ├── urls.py                                 # Route : /reporting/<uuid>/pdf/
+│   ├── services/
+│   │   ├── pdf_generator.py                    # ✅ Génération PDF via WeasyPrint
+│   │   └── chart_generator.py                  # ✅ Graphiques Matplotlib pour PDF
+│   ├── templates/reporting/
+│   │   ├── pdf_base.html                       # Template PDF de base
+│   │   ├── pdf_rapport.html                    # Rapport complet
+│   │   └── components/
+│   │       ├── cover.html                      # Page de couverture
+│   │       ├── summary.html                    # Résumé exécutif
+│   │       ├── technical.html                  # Détails techniques
+│   │       ├── financial.html                  # Analyse financière
+│   │       └── recommendations.html            # Recommandations
+│   ├── static/                                 # Assets PDF (images, styles)
+│   └── tests/
+│
+│
+├── 📂 frontend/                                # 🎨 APP FRONTEND — Interface web
+│   │
+│   ├── models.py                               # ✅ MODÈLES PRINCIPAUX (961 lignes)
+│   │   ├── Installation                        # Configuration installation PV
+│   │   │   → latitude, longitude, adresse
+│   │   │   → puissance_kw, orientation (S/SE/SW/E/EW/W/N...)
+│   │   │   → inclinaison, type_toiture
+│   │   │   → FK → ConsumptionProfileModel
 │   │   │
-│   │   └── production.py                 # Calculs production photovoltaïque
-│   │       ├── SolarInstallation        # Classe pour calculs
-│   │       └── [méthodes de calcul]
+│   │   ├── Simulation                          # Exécution d'une simulation
+│   │   │   → FK → Installation
+│   │   │   → status (pending/running/success/failed)
+│   │   │   → task_id (Celery)
+│   │   │   → FK → Resultat
+│   │   │
+│   │   └── Resultat                            # Résultats complets
+│   │       → production_annuelle_kwh, production_mensuelle_kwh (JSON 12)
+│   │       → production_horaire_kwh (JSON 24 — moyenne journalière)
+│   │       → consommation_annuelle_kwh, consommation_mensuelle_kwh (JSON 12)
+│   │       → consommation_horaire_kwh (JSON 24)
+│   │       → autoconsommation_kwh_actuel / _optimise
+│   │       → autoconsommation_ratio_actuel / _optimise
+│   │       → economie_annuelle_actuel / _optimise
+│   │       → gain_autoconso_kwh, gain_autoconso_pct
+│   │       → gain_economie_annuel, gain_economie_25ans
+│   │       → taux_autoproduction_pct
+│   │       → injection_reseau_kwh
+│   │       → roi_25ans_euros, taux_rentabilite_pct
 │   │
-│   ├── services/                         # 🔗 SERVICES MÉTIER
-│   │   ├── __init__.py
-│   │   └── simulation.py                 # Orchestration complète
-│   │       └── SimulationOrchestrator    # Coordonne les calculs
+│   ├── views.py                                # ✅ VUES PRINCIPALES (1888 lignes)
+│   │   ├── HomeView                            # Page d'accueil
+│   │   ├── SimulationFormView                  # Formulaire 4 étapes (CBV)
+│   │   │   → get_initial() : pré-remplissage depuis profil
+│   │   │   → get_context_data() : restore mode, flags JS
+│   │   │   → form_valid() : création Installation + Simulation + lancement Celery
+│   │   ├── SimulationProgressView              # Page progression (polling HTMX)
+│   │   ├── SimulationResultsView               # Page résultats + contexte graphiques
+│   │   ├── calculate_optimal_power()           # API JSON : puissance recommandée
+│   │   ├── simulation_progress_api()           # API JSON : état tâche Celery
+│   │   ├── ConsumptionCalculatorView           # Calculateur rapide
+│   │   ├── consumption_calculator_expert()     # Calculateur expert
+│   │   ├── configure_consumption()             # Formulaire profil de consommation
+│   │   ├── simulation_pdf_download()           # Export PDF
+│   │   └── simulation_excel_download()         # Export Excel
 │   │
-│   ├── templates/
-│   │   └── solar_calc/
+│   ├── urls.py                                 # ~30 routes
+│   ├── frontend_forms.py                       # InstallationForm (formulaire Django)
+│   ├── consumption_forms.py                    # ConsumptionProfileForm
+│   │
+│   ├── services/
+│   │   ├── pdf_service.py                      # Service PDF frontend
+│   │   ├── export_service.py                   # Service exports
+│   │   └── simulation_service.py               # Service simulation
+│   │
+│   ├── middleware/                              # Middlewares custom
+│   ├── templatetags/                           # Filtres Django custom
+│   ├── management/commands/                    # Commandes management
+│   │
+│   ├── templates/frontend/
+│   │   ├── home.html                           # Page d'accueil
+│   │   │
+│   │   ├── simulation/
+│   │   │   ├── form.html                       # ✅ Formulaire 4 étapes (~977 lignes)
+│   │   │   │   → Étape 1 : Carte Leaflet + géolocalisation
+│   │   │   │   → Étape 2 : Options consommation + profil OBLIGATOIRE
+│   │   │   │   → Étape 3 : Choix objectif (rentabilité/autoconso/équilibre)
+│   │   │   │   → Étape 4 : Config technique (puissance, orientation E/W, inclinaison)
+│   │   │   │
+│   │   │   ├── progress.html                   # Barre de progression Celery
+│   │   │   ├── progress_bar.html               # Composant barre
+│   │   │   ├── results.html                    # ✅ Page résultats (~350 lignes)
+│   │   │   │   → 5 KPIs (production, autoconso, autonomie, économies, ROI)
+│   │   │   │   → Détails installation + Bilan Solaire
+│   │   │   │   → Graphique mensuel (Plotly bar chart)
+│   │   │   │   → Graphique horaire moyen 24h (Plotly area chart)
+│   │   │   │   → Comparaison scénarios actuel/optimisé
+│   │   │   │   → Section batterie (si données disponibles)
+│   │   │   │   → Boutons export PDF/Excel
+│   │   │   └── chunks/form_part_00*.html       # Formulaire découpé (legacy)
+│   │   │
+│   │   ├── consumption/
+│   │   │   ├── calculator.html                 # Calculateur rapide
+│   │   │   ├── result.html                     # Résultat calculateur
+│   │   │   └── details.html                    # Détails consommation
+│   │   │
+│   │   ├── configure_consumption.html          # Formulaire profil consommation
+│   │   ├── calculator_expert.html              # Calculateur expert
+│   │   ├── result_expert.html                  # Résultat expert
+│   │   ├── details_expert.html                 # Détails expert
+│   │   │
+│   │   ├── legal/                              # Pages légales
+│   │   │   ├── mentions.html
+│   │   │   ├── cgv.html
+│   │   │   └── privacy.html
+│   │   │
+│   │   └── pdf/                                # Templates PDF
+│   │       ├── base_pdf.html
+│   │       └── rapport_expert.html
+│   │
 │   ├── migrations/
 │   └── tests/
 │
 │
-├── 📂 battery/                           # 🔋 APP BATTERY - Stockage (futur)
-│   ├── __init__.py
-│   ├── models.py
-│   ├── admin.py
-│   ├── apps.py
-│   ├── services/
-│   │   ├── __init__.py
-│   │   └── battery_simulation.py        # Logique batterie
-│   ├── migrations/
-│   └── tests/
-│
-│
-├── 📂 financial/                         # 💰 APP FINANCIAL - Rentabilité
-│   ├── __init__.py
-│   ├── models.py
-│   ├── admin.py
-│   ├── apps.py
-│   ├── services/
-│   │   ├── __init__.py
-│   │   ├── roi.py                        # Calcul ROI
-│   │   ├── van.py                        # Calcul VAN
-│   │   └── tri.py                        # Calcul TRI
-│   ├── templates/
-│   │   └── financial/
-│   ├── migrations/
-│   └── tests/
-│
-│
-├── 📂 reporting/                         # 📊 APP REPORTING - Rapports
-│   ├── __init__.py
-│   ├── models.py
-│   ├── admin.py
-│   ├── apps.py
-│   ├── services/
-│   │   ├── __init__.py
-│   │   ├── pdf_generator.py              # Génération PDF
-│   │   ├── excel_exporter.py             # Export Excel/CSV
-│   │   └── charts.py                     # Graphiques
-│   ├── templates/
-│   │   └── reporting/
-│   ├── migrations/
-│   └── tests/
-│
-│
-├── 📂 frontend/                          # 🎨 APP FRONTEND - Interface web
-│   ├── __init__.py
-│   ├── models.py                         # Modèles (utilisateurs, projets, etc.)
-│   ├── admin.py
-│   ├── apps.py
-│   ├── views.py                          # Vues Django (contrôleurs)
-│   ├── urls.py                           # Routage app
-│   ├── forms.py                          # Formulaires Django
-│   │
-│   ├── management/
-│   │   ├── __init__.py
-│   │   └── commands/                     # Commandes custom
-│   │
-│   ├── middleware/
-│   │   ├── __init__.py
-│   │   └── [middlewares custom]
-│   │
-│   ├── templatetags/
-│   │   ├── __init__.py
-│   │   └── custom_filters.py             # Filtres Jinja2 custom
-│   │
-│   ├── services/
-│   │   ├── __init__.py
-│   │   └── [services métier]
-│   │
-│   ├── static/
-│   │   └── frontend/
-│   │       ├── css/                      # Styles Tailwind
-│   │       ├── js/                       # Alpine.js + HTMX
-│   │       └── images/
-│   │
-│   ├── templates/
-│   │   └── frontend/
-│   │       ├── base.html                 # Template parent
-│   │       ├── home.html                 # Page d'accueil
-│   │       ├── consumption/
-│   │       │   ├── list.html
-│   │       │   ├── detail.html
-│   │       │   └── form.html
-│   │       ├── simulation/
-│   │       │   ├── list.html
-│   │       │   ├── detail.html
-│   │       │   └── form.html
-│   │       ├── legal/
-│   │       │   ├── privacy.html
-│   │       │   └── terms.html
-│   │       └── pdf/
-│   │           └── [templates PDF]
-│   │
-│   ├── migrations/
-│   ├── tests/
-│   │   ├── __init__.py
-│   │   ├── test_views.py
-│   │   ├── test_forms.py
-│   │   └── fixtures/
-│   │       └── [données test]
-│   └── __init__.py
-│
-│
-└── 📂 tests/                             # 🧪 TESTS GLOBAUX
-    ├── __init__.py
-    ├── test_pvgis.py                     # Tests API PVGIS
+└── 📂 tests/                                   # 🧪 TESTS GLOBAUX
+    ├── test_pvgis.py                           # Tests API PVGIS
     ├── test_pvgis_simple.py
     ├── test_pvgis_v53_discovery.py
-    └── test_simulation.py                # Tests simulation
+    ├── test_simulation.py                      # Tests simulation end-to-end
+    └── test_expert_calculator.py               # Tests calculateur expert
+
+
+================================================================================
+  FLUX PRINCIPAL — SIMULATION END-TO-END
+================================================================================
+
+  ┌─────────────┐     ┌──────────────────┐     ┌─────────────────┐
+  │  Formulaire  │────▶│ SimulationForm   │────▶│ Installation    │
+  │  4 étapes    │     │ View.form_valid()│     │ + Profil créés  │
+  └─────────────┘     └──────────────────┘     └────────┬────────┘
+                                                        │
+                                                        ▼
+  ┌─────────────┐     ┌──────────────────┐     ┌─────────────────┐
+  │  Résultats   │◀────│ Resultat saved   │◀────│ Celery Task     │
+  │  results.html│     │ in DB            │     │ run_simulation  │
+  └─────────────┘     └──────────────────┘     └────────┬────────┘
+                                                        │
+                              ┌──────────────────────────┤
+                              │                          │
+                              ▼                          ▼
+                    ┌─────────────────┐     ┌──────────────────────┐
+                    │ PVGIS 5.3 API   │     │ Profil consommation  │
+                    │ → 8760h GHI     │     │ → decompose_conso()  │
+                    │ → température   │     │ → generate_hourly()  │
+                    └─────────────────┘     └──────────────────────┘
+
+
+================================================================================
+  MODÈLES DE DONNÉES — RELATIONS
+================================================================================
+
+  User (Django)
+    │
+    ├── 1:N ──▶ Installation
+    │              │
+    │              ├── FK ──▶ ConsumptionProfileModel (solar_calc)
+    │              │              → surface, DPE, chauffage, ECS
+    │              │              → profil occupation, appareils (JSON)
+    │              │
+    │              └── 1:N ──▶ Simulation
+    │                             │
+    │                             └── FK ──▶ Resultat (frontend)
+    │                                          → production (annuelle, mensuelle, horaire)
+    │                                          → consommation (annuelle, mensuelle, horaire)
+    │                                          → scénario actuel + optimisé
+    │                                          → gains, ROI, injection
+    │
+    └── 1:N ──▶ ConsommationCalculee (solar_calc)
+                   → Résultat des calculateurs rapide/expert
+
+
+================================================================================
+  TARIFS INTÉGRÉS (Février 2026)
+================================================================================
+
+  Achat réseau :  0.1940 €/kWh TTC (tarif réglementé base EDF)
+
+  Injection EDF OA (surplus) :
+    ≤ 9 kWc  :  0.0400 €/kWh
+    9-36 kWc  :  0.0617 €/kWh
+    36-100 kWc:  0.0617 €/kWh
+    > 100 kWc :  0.0536 €/kWh (estimatif — appel d'offres)
