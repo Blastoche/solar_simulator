@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Mentions Légales - Solar Simulator{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-12">
+    <div class="container mx-auto px-4 max-w-4xl">
+        
+        <div class="bg-white rounded-2xl shadow-xl p-8 md:p-12">
+            
+            <h1 class="text-4xl font-bold mb-8 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Mentions Légales
+            </h1>
+            
+            <div class="prose prose-lg max-w-none">
+                
+                <section class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">1. Éditeur du site</h2>
+                    <p class="text-gray-700 mb-2"><strong>Raison sociale :</strong> [Votre nom ou raison sociale]</p>
+                    <p class="text-gray-700 mb-2"><strong>Forme juridique :</strong> [Auto-entrepreneur / SASU / SARL / etc.]</p>
+                    <p class="text-gray-700 mb-2"><strong>Siège social :</strong> [Votre adresse]</p>
+                    <p class="text-gray-700 mb-2"><strong>SIRET :</strong> [Votre numéro SIRET]</p>
+                    <p class="text-gray-700 mb-2"><strong>Email :</strong> contact@solar-simulator.fr</p>
+                    <p class="text-gray-700 mb-2"><strong>Téléphone :</strong> [Votre numéro]</p>
+                    <p class="text-gray-700 mb-2"><strong>Directeur de publication :</strong> Bastien Laffargue</p>
+                </section>
+                
+                <section class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">2. Hébergement</h2>
+                    <p class="text-gray-700 mb-2"><strong>Hébergeur :</strong> [Nom hébergeur - ex: OVH, AWS, etc.]</p>
+                    <p class="text-gray-700 mb-2"><strong>Siège social :</strong> [Adresse hébergeur]</p>
+                    <p class="text-gray-700 mb-2"><strong>Téléphone :</strong> [Numéro hébergeur]</p>
+                </section>
+                
+                <section class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">3. Propriété intellectuelle</h2>
+                    <p class="text-gray-700 mb-4">
+                        L'ensemble du contenu de ce site (textes, images, graphismes, logo, icônes, sons, logiciels, etc.) 
+                        est la propriété exclusive de Solar Simulator, à l'exception des marques, logos ou contenus 
+                        appartenant à d'autres sociétés partenaires ou auteurs.
+                    </p>
+                    <p class="text-gray-700">
+                        Toute reproduction, distribution, modification, adaptation, retransmission ou publication, 
+                        même partielle, de ces différents éléments est strictement interdite sans l'accord exprès 
+                        par écrit de Solar Simulator.
+                    </p>
+                </section>
+                
+                <section class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">4. Données personnelles</h2>
+                    <p class="text-gray-700 mb-4">
+                        Conformément au Règlement Général sur la Protection des Données (RGPD) et à la loi Informatique et Libertés, 
+                        vous disposez d'un droit d'accès, de rectification et de suppression des données vous concernant.
+                    </p>
+                    <p class="text-gray-700">
+                        Pour exercer ce droit, contactez-nous à : <a href="mailto:contact@solar-simulator.fr" class="text-blue-600 hover:underline">contact@solar-simulator.fr</a>
+                    </p>
+                    <p class="text-gray-700 mt-2">
+                        Pour plus d'informations, consultez notre <a href="{% url 'frontend:privacy' %}" class="text-blue-600 hover:underline">Politique de Confidentialité</a>.
+                    </p>
+                </section>
+                
+                <section class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">5. Cookies</h2>
+                    <p class="text-gray-700">
+                        Ce site utilise des cookies pour améliorer l'expérience utilisateur et analyser le trafic. 
+                        Vous pouvez accepter ou refuser les cookies via la bannière affichée lors de votre première visite.
+                    </p>
+                </section>
+                
+                <section class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">6. Limitation de responsabilité</h2>
+                    <p class="text-gray-700 mb-4">
+                        Solar Simulator s'efforce d'assurer l'exactitude et la mise à jour des informations diffusées sur ce site. 
+                        Toutefois, Solar Simulator ne peut garantir l'exactitude, la précision ou l'exhaustivité des informations 
+                        mises à disposition sur ce site.
+                    </p>
+                    <p class="text-gray-700 mb-4">
+                        Les simulations fournies sont basées sur des données météorologiques historiques et des estimations. 
+                        Les résultats réels peuvent varier en fonction de nombreux facteurs.
+                    </p>
+                    <p class="text-gray-700">
+                        Solar Simulator ne saurait être tenu responsable des dommages directs ou indirects résultant 
+                        de l'utilisation de ce site ou des informations qu'il contient.
+                    </p>
+                </section>
+                
+                <section class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">7. Droit applicable</h2>
+                    <p class="text-gray-700">
+                        Les présentes mentions légales sont régies par le droit français. 
+                        En cas de litige, les tribunaux français seront seuls compétents.
+                    </p>
+                </section>
+                
+                <section class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">8. Contact</h2>
+                    <p class="text-gray-700">
+                        Pour toute question concernant les mentions légales, contactez-nous à : 
+                        <a href="mailto:contact@solar-simulator.fr" class="text-blue-600 hover:underline">contact@solar-simulator.fr</a>
+                    </p>
+                </section>
+                
+                <div class="mt-8 p-4 bg-gray-100 rounded-lg">
+                    <p class="text-sm text-gray-600">
+                        <strong>Dernière mise à jour :</strong> {{ "now"|date:"d/m/Y" }}
+                    </p>
+                </div>
+                
+            </div>
+            
+        </div>
+        
+    </div>
+</div>
+{% endblock %}

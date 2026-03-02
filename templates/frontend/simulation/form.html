@@ -1,0 +1,2332 @@
+{% extends "base.html" %}
+{% load l10n %}
+
+{% block title %}Simulation Solaire - Solar Simulator{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+<style>
+    #map { height: 400px; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+
+    /* Panneau de dessin de toiture */
+    #drawing-panel {
+        background: linear-gradient(135deg, #f0f4ff, #e6efff);
+        border: 2px solid #667eea;
+        border-radius: 0.75rem;
+        padding: 1rem 1.25rem;
+        margin-top: 0.75rem;
+        display: none;
+    }
+    #drawing-panel.visible { display: block; }
+    #roof-result {
+        background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+        border: 2px solid #10b981;
+        border-radius: 0.75rem;
+        padding: 1rem 1.25rem;
+        margin-top: 0.75rem;
+        display: none;
+    }
+    #roof-result.visible { display: block; }
+    .draw-btn {
+        display: inline-flex; align-items: center; gap: 0.5rem;
+        padding: 0.6rem 1.1rem; border-radius: 0.5rem; font-weight: 600;
+        font-size: 0.875rem; cursor: pointer; transition: all 0.2s; border: none;
+    }
+    .draw-btn-primary { background: #667eea; color: white; }
+    .draw-btn-primary:hover { background: #5a67d8; }
+    .draw-btn-danger { background: #ef4444; color: white; }
+    .draw-btn-danger:hover { background: #dc2626; }
+    .draw-btn-gray { background: #e5e7eb; color: #374151; }
+    .draw-btn-gray:hover { background: #d1d5db; }
+
+    /* Poignées Leaflet.draw : rondes et petites */
+    .leaflet-div-icon,
+    .leaflet-editing-icon {
+        background: #667eea !important;
+        border: 2px solid white !important;
+        border-radius: 50% !important;
+        width: 10px !important;
+        height: 10px !important;
+        margin-left: -5px !important;
+        margin-top: -5px !important;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.4) !important;
+    }
+    .leaflet-draw-tooltip {
+        border-radius: 6px !important;
+        font-size: 12px !important;
+    }
+    .form-section { background: white; border-radius: 1rem; padding: 2rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); margin-bottom: 2rem; }
+
+    /* Indicateur d'étapes ”” nouveau design */
+    .step-indicator {
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 0;
+        margin-bottom: 2.5rem;
+    }
+    .step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 1;
+        max-width: 110px;
+        position: relative;
+        z-index: 1;
+    }
+    .step-circle {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: white;
+        border: 2px solid #d1d5db;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.85rem;
+        color: #9ca3af;
+        transition: all 0.3s;
+        flex-shrink: 0;
+    }
+    .step.active .step-circle {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        border-color: #667eea;
+        color: white;
+        box-shadow: 0 0 0 4px rgba(102,126,234,0.2);
+        transform: scale(1.1);
+    }
+    .step.completed .step-circle {
+        background: #10b981;
+        border-color: #10b981;
+        color: white;
+    }
+    .step-label {
+        font-size: 0.68rem;
+        color: #9ca3af;
+        margin-top: 6px;
+        text-align: center;
+        font-weight: 500;
+        line-height: 1.2;
+        max-width: 70px;
+    }
+    .step.active .step-label { color: #667eea; font-weight: 700; }
+    .step.completed .step-label { color: #10b981; font-weight: 600; }
+    .step-connector {
+        flex: 1;
+        height: 2px;
+        background: #e5e7eb;
+        margin-top: 19px; /* centré avec les cercles */
+        transition: background 0.3s;
+        min-width: 20px;
+    }
+    .step-connector.done { background: #10b981; }
+    .step.hidden-step { display: none; }
+
+    /* Cartes objectifs */
+    .objectif-card { border: 3px solid #e5e7eb; border-radius: 1rem; padding: 1.5rem; cursor: pointer;
+                     transition: all 0.3s; background: white; height: 100%; }
+    .objectif-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-color: #667eea; }
+    .objectif-card.selected { border-color: #667eea; background: linear-gradient(135deg, #f0f4ff 0%, #e6efff 100%);
+                             box-shadow: 0 0 0 3px rgba(102,126,234,0.2); }
+    .objectif-icon { width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center;
+                    justify-content: center; font-size: 2rem; margin: 0 auto 1rem; }
+
+    /* Cartes mode principal */
+    .mode-card { border: 3px solid #e5e7eb; border-radius: 1.5rem; padding: 2rem; cursor: pointer;
+                 transition: all 0.3s; background: white; text-align: center; }
+    .mode-card:hover { transform: translateY(-6px); box-shadow: 0 15px 35px rgba(0,0,0,0.12); }
+    .mode-card.selected-autoconso { border-color: #10b981; background: linear-gradient(135deg, #f0fdf4, #dcfce7); box-shadow: 0 0 0 3px rgba(16,185,129,0.2); }
+    .mode-card.selected-vente { border-color: #f59e0b; background: linear-gradient(135deg, #fffbeb, #fef3c7); box-shadow: 0 0 0 3px rgba(245,158,11,0.2); }
+
+    /* Configuration résultat */
+    .config-result { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;
+                    border-radius: 1rem; padding: 2rem; margin-bottom: 2rem; }
+    .config-metric { background: rgba(255,255,255,0.2); border-radius: 0.5rem; padding: 1rem; }
+
+    /* Autocomplete */
+    #address-suggestions { position: absolute; top: 100%; left: 0; right: 0; background: white;
+                          border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 0.5rem 0.5rem;
+                          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); max-height: 300px;
+                          overflow-y: auto; z-index: 1000; display: none; }
+    #address-suggestions.show { display: block; }
+    .suggestion-item { padding: 0.75rem 1rem; cursor: pointer; border-bottom: 1px solid #f3f4f6; transition: background 0.2s; }
+    .suggestion-item:hover { background: #f9fafb; }
+
+    /* Options cliquables (ombrage, onduleur, panneau) */
+    .ombrage-option, .onduleur-option, .panneau-option { cursor: pointer; transition: all 0.2s; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if request.GET.profil_id %}
+<div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+    <div class="flex items-center">
+        <div class="flex-shrink-0">
+            <svg class="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </div>
+        <div class="ml-3">
+            <p class="text-sm font-medium text-blue-800">✅ Votre profil de consommation est bien pris en compte dans cette simulation</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-12">
+<div class="container mx-auto px-4">
+
+    <!-- Header -->
+    <div class="text-center mb-12">
+        <h1 class="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            ☀️ Simulation Solaire Intelligente
+        </h1>
+        <p class="text-xl text-gray-600 max-w-2xl mx-auto">Dimensionnement optimal adapté à vos objectifs</p>
+    </div>
+
+    <!-- Indicateur d'étapes dynamique -->
+    <div class="max-w-5xl mx-auto mb-12">
+        <div class="step-indicator" id="step-indicator">
+            <div class="step active" id="step-1">
+                <div class="step-circle">1</div>
+                <div class="step-label">Localisation</div>
+            </div>
+            <div class="step-connector" id="conn-1-2"></div>
+            <div class="step" id="step-2">
+                <div class="step-circle">2</div>
+                <div class="step-label">Objectif</div>
+            </div>
+            <div class="step-connector" id="conn-2-3"></div>
+            <div class="step" id="step-3a">
+                <div class="step-circle">3</div>
+                <div class="step-label">Consommation</div>
+            </div>
+            <div class="step hidden-step" id="step-3b">
+                <div class="step-circle">3</div>
+                <div class="step-label">Installation</div>
+            </div>
+            <div class="step-connector" id="conn-3-4"></div>
+            <div class="step" id="step-4a">
+                <div class="step-circle">4</div>
+                <div class="step-label">Toiture</div>
+            </div>
+            <div class="step-connector" id="conn-4-5"></div>
+            <div class="step" id="step-5">
+                <div class="step-circle" id="step5-num">5</div>
+                <div class="step-label">Configuration</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulaire -->
+    <form id="simulation-form" method="post" action="{% url 'frontend:simulation_create' %}" class="max-w-5xl mx-auto">
+        {% csrf_token %}
+
+        {% if form.errors %}
+        <div style="background:#fef2f2;border:3px solid #ef4444;color:#991b1b;padding:1.5rem;border-radius:0.75rem;margin-bottom:2rem;">
+            <h3 style="font-size:1.25rem;font-weight:bold;margin-bottom:0.75rem;">⚠️ Erreurs :</h3>
+            <ul style="list-style:disc;padding-left:1.5rem;">
+                {% for field,errors in form.errors.items %}
+                <li><strong>{{ field }}</strong> : {{ errors.0 }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if messages %}
+        <div style="margin-bottom:2rem;">
+            {% for message in messages %}
+            <div style="padding:1rem;border-radius:0.5rem;margin-bottom:0.5rem;
+                {% if message.tags == 'error' %}background:#fef2f2;border:2px solid #ef4444;color:#991b1b;
+                {% elif message.tags == 'success' %}background:#f0fdf4;border:2px solid #10b981;color:#065f46;
+                {% else %}background:#eff6ff;border:2px solid #3b82f6;color:#1e40af;{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!--  ÉTAPE 1 : LOCALISATION  -->
+        <div class="form-section" id="section-1">
+            <h2 class="text-2xl font-bold mb-6 flex items-center">
+                <span class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white mr-3">1</span>
+                📍 Où se situe votre projet ?
+            </h2>
+
+            <!-- Carte satellite -->
+            <div class="mb-4">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Cliquez sur la carte ou recherchez votre adresse</label>
+                <div id="map"></div>
+            </div>
+
+            <!-- Bascule satellite / plan -->
+            <div class="flex gap-2 mb-4">
+                <button type="button" id="btn-satellite" onclick="setMapLayer('satellite')"
+                        class="draw-btn draw-btn-primary text-xs">🛰️ Satellite</button>
+                <button type="button" id="btn-plan" onclick="setMapLayer('plan')"
+                        class="draw-btn draw-btn-gray text-xs">🗺️ Plan</button>
+            </div>
+
+            <!-- Champ adresse -->
+            <div class="mb-4 relative">
+                <label for="adresse-input" class="block text-sm font-semibold text-gray-700 mb-2">🔍 Adresse</label>
+                <input type="text" name="adresse" id="adresse-input"
+                       class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                       placeholder="Ex: 10 rue de la Paix, Marseille" autocomplete="off">
+                <div id="address-suggestions"></div>
+            </div>
+
+            <!-- Coordonnées -->
+            <input type="hidden" name="latitude" id="latitude-input">
+            <input type="hidden" name="longitude" id="longitude-input">
+            <div class="grid md:grid-cols-2 gap-4 mb-5 items-start">
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <div class="text-sm text-gray-600">Latitude</div>
+                    <div class="text-lg font-bold" id="display-lat">-- (cliquez sur la carte)</div>
+                </div>
+                <div class="bg-purple-50 p-4 rounded-lg">
+                    <div class="text-sm text-gray-600">Longitude</div>
+                    <div class="text-lg font-bold" id="display-lon">-- (cliquez sur la carte)</div>
+                </div>
+            </div>
+
+            <!-- ─── Bloc dessin de toiture ─── -->
+            <div class="border-t border-gray-200 pt-5 mb-5">
+                <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
+                    <div>
+                        <h3 class="font-bold text-gray-800">✏️ Délimiter votre toiture / pan de toiture <span class="text-sm font-normal text-gray-500">(optionnel)</span></h3>
+                        <p class="text-xs text-gray-500 mt-0.5">Dessinez le contour du pan de toiture où vous poseriez l'installation pour calculer automatiquement la surface et l'orientation.</p>
+                    </div>
+                    <button type="button" id="btn-draw-roof" onclick="startDrawing()"
+                            class="draw-btn draw-btn-primary">
+                        ✏️ Dessiner ma toiture
+                    </button>
+                </div>
+
+                <!-- Instructions pendant le dessin -->
+                <div id="drawing-panel">
+                    <div class="flex items-start gap-3">
+                        <div class="text-2xl">🖊️</div>
+                        <div>
+                            <p class="font-semibold text-blue-800 text-sm">Mode dessin actif</p>
+                            <ul class="text-xs text-blue-700 mt-1 space-y-0.5">
+                                <li>• Cliquez pour placer chaque sommet de votre toiture</li>
+                                <li>• Double-cliquez pour terminer, puis cliquez <strong>Valider</strong></li>
+                                <li>• Passez en vue <strong>Satellite</strong> pour mieux voir votre toit</li>
+                            </ul>
+                            <div class="flex gap-2 mt-2">
+                                <button type="button" id="btn-validate-drawing" onclick="validateDrawing()" class="draw-btn draw-btn-primary text-xs" style="display:none;">
+                                    ✅ Valider la toiture
+                                </button>
+                                <button type="button" onclick="cancelDrawing()" class="draw-btn draw-btn-danger text-xs">
+                                    ✕ Annuler
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Résultat du dessin -->
+                <div id="roof-result">
+                    <div class="flex items-center justify-between flex-wrap gap-3">
+                        <div class="flex items-center gap-4">
+                            <div class="text-2xl">🏠</div>
+                            <div>
+                                <p class="text-sm font-semibold text-green-800">Toiture délimitée ✅</p>
+                                <div class="flex gap-4 mt-1">
+                                    <div>
+                                        <span class="text-xs text-gray-500">Surface : </span>
+                                        <span class="font-bold text-green-700" id="roof-surface-display">--</span>
+                                        <span class="text-xs text-gray-500"> m²</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-xs text-gray-500">Orientation : </span>
+                                        <span class="font-bold text-blue-700" id="roof-orientation-display">--</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" onclick="clearRoofDrawing()" class="draw-btn draw-btn-gray text-xs">
+                            🗑️ Recommencer
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">Ces valeurs seront pré-remplies automatiquement dans les étapes suivantes.</p>
+                </div>
+            </div>
+
+            <!-- Champs cachés données toiture dessinée -->
+            <input type="hidden" id="roof-surface-hidden" value="">
+            <input type="hidden" id="roof-orientation-hidden" value="">
+
+            <button type="button" onclick="nextStep(2)"
+                    class="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition transform hover:scale-105 font-semibold text-lg">
+                Continuer <i class="fas fa-arrow-right ml-2"></i>
+            </button>
+        </div>
+
+        <!-- ══════════════ ÉTAPE 2 : OBJECTIF ══════════════ -->
+        <div class="form-section hidden" id="section-2">
+            <h2 class="text-2xl font-bold mb-6 flex items-center">
+                <span class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white mr-3">2</span>
+                🎯 Quel est votre objectif principal ?
+            </h2>
+
+            <!-- Choix mode principal -->
+            <div class="grid md:grid-cols-2 gap-6 mb-6">
+                <div class="mode-card" onclick="selectMode('autoconso')" id="mode-autoconso">
+                    <div class="text-5xl mb-3">🏠</div>
+                    <h3 class="text-2xl font-bold mb-2 text-green-700">AUTOCONSOMMER</h3>
+                    <p class="text-gray-600 text-sm mb-3">Réduire ma facture en consommant ma propre production solaire</p>
+                    <ul class="text-sm text-gray-700 space-y-1 text-left">
+                        <li>✔ Économies sur la facture EDF</li>
+                        <li>✔ Indépendance énergétique</li>
+                        <li>✔ Surplus revendu au réseau</li>
+                    </ul>
+                </div>
+                <div class="mode-card" onclick="selectMode('vente')" id="mode-vente">
+                    <div class="text-5xl mb-3">💸</div>
+                    <h3 class="text-2xl font-bold mb-2 text-amber-700">VENDRE</h3>
+                    <p class="text-gray-600 text-sm mb-3">Vendre 100% de ma production à EDF OA avec un tarif garanti 20 ans</p>
+                    <ul class="text-sm text-gray-700 space-y-1 text-left">
+                        <li>✔ Revenus garantis 20 ans</li>
+                        <li>✔ Tarif fixé par l'État</li>
+                        <li>⚠️ Facture EDF inchangée</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Sous-objectifs autoconso (apparaissent au clic) -->
+            <div id="sous-objectifs" class="hidden mb-6">
+                <div class="bg-green-50 border-2 border-green-200 rounded-xl p-6">
+                    <h3 class="font-bold text-lg text-green-900 mb-4">🎯 Quelle est votre priorité ?</h3>
+                    <div class="grid md:grid-cols-3 gap-4">
+                        <div class="objectif-card" onclick="selectObjectif('rentabilite')" id="obj-rentabilite">
+                            <div class="objectif-icon bg-yellow-100">💰</div>
+                            <h3 class="text-lg font-bold text-center mb-2">RENTABILITÉ</h3>
+                            <p class="text-center text-sm text-gray-600 mb-2">ROI optimal (8-10 ans)</p>
+                            <ul class="text-xs space-y-1 text-gray-700">
+                                <li>✔ Autoconso ~70%</li>
+                                <li>✔ Retour rapide</li>
+                            </ul>
+                        </div>
+                        <div class="objectif-card" onclick="selectObjectif('equilibre')" id="obj-equilibre">
+                            <div class="objectif-icon bg-purple-100">⚖️</div>
+                            <h3 class="text-lg font-bold text-center mb-2">ÉQUILIBRE</h3>
+                            <p class="text-center text-sm text-gray-600 mb-2">Meilleur compromis</p>
+                            <ul class="text-xs space-y-1 text-gray-700">
+                                <li>✔ Autoconso ~85%</li>
+                                <li>✔ Recommandé</li>
+                            </ul>
+                        </div>
+                        <div class="objectif-card" onclick="selectObjectif('autonomie')" id="obj-autonomie">
+                            <div class="objectif-icon bg-blue-100">⚡</div>
+                            <h3 class="text-lg font-bold text-center mb-2">AUTONOMIE</h3>
+                            <p class="text-center text-sm text-gray-600 mb-2">Indépendance maximale</p>
+                            <ul class="text-xs space-y-1 text-gray-700">
+                                <li>✔ Autoconso ~95%</li>
+                                <li>✔ Minimum réseau</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <input type="hidden" id="objectif_choisi" name="objectif">
+            <input type="hidden" id="mode_principal" name="mode_principal">
+
+            <div class="flex gap-4">
+                <button type="button" onclick="prevStep(1)"
+                        class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
+                    <i class="fas fa-arrow-left mr-2"></i> Retour
+                </button>
+                <button type="button" onclick="goFromStep2()"
+                        class="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition font-semibold">
+                    Continuer <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- ══════════════ ÉTAPE 3A : CONSOMMATION (autoconso) ══════════════ -->
+        <div class="form-section hidden" id="section-3a">
+            <h2 class="text-2xl font-bold mb-6 flex items-center">
+                <span class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white mr-3">3</span>
+                ⚡ Quelle est votre consommation électrique ?
+            </h2>
+            <div class="space-y-4 mb-6">
+                <!-- Option A -->
+                <div class="border-2 border-gray-200 rounded-lg p-4 hover:border-blue-500 transition cursor-pointer"
+                     onclick="selectConsoOption('analysee')">
+                    <label class="flex items-start cursor-pointer">
+                        <input type="radio" name="conso_option" value="analysee" class="mt-1 mr-3">
+                        <div>
+                            <div class="font-semibold text-lg">✅ J'ai déjà analysé ma consommation</div>
+                            <p class="text-sm text-gray-600 mt-1">Vous avez utilisé notre calculateur ? Vos données sont pré-remplies !</p>
+                            <div id="conso-analysee-details" class="hidden mt-3 p-3 bg-green-50 rounded">
+                                <div class="font-semibold">📊 Consommation : <span id="conso-value">--</span> kWh/an</div>
+                            </div>
+                        </div>
+                    </label>
+                </div>
+                <!-- Option B -->
+                <div class="border-2 border-gray-200 rounded-lg p-4 hover:border-blue-500 transition cursor-pointer"
+                     onclick="selectConsoOption('manuelle')">
+                    <label class="flex items-start cursor-pointer">
+                        <input type="radio" name="conso_option" value="manuelle" class="mt-1 mr-3">
+                        <div class="flex-1">
+                            <div class="font-semibold text-lg">✍️ Je connais ma consommation</div>
+                            <p class="text-sm text-gray-600 mt-1">Saisissez votre consommation annuelle</p>
+                            <div id="conso-manuelle-input" class="hidden mt-3">
+                                <input type="number" id="consommation_annuelle" name="consommation_annuelle"
+                                       class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                       placeholder="Ex: 5000" min="1000" max="50000">
+                                <p class="text-xs text-gray-500 mt-1">kWh/an (voir sur votre facture EDF)</p>
+                                <div id="profile-required-box" class="mt-3 p-4 bg-amber-50 rounded-lg border-2 border-amber-400">
+                                    <p class="text-sm text-amber-900 mb-3 font-semibold">⚠️ Un profil de consommation est nécessaire</p>
+                                    <a href="#" id="detailed-consumption-link"
+                                       class="inline-flex items-center justify-center w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition text-sm font-bold">
+                                        <i class="fas fa-clipboard-list mr-2"></i>
+                                        Créer mon profil de consommation (2 min)
+                                    </a>
+                                </div>
+                                <div id="profile-created-box" class="mt-3 p-4 bg-green-50 rounded-lg border-2 border-green-400 hidden">
+                                    <p class="text-sm text-green-800 font-semibold">✅ Profil de consommation créé ”” Vous pouvez continuer</p>
+                                </div>
+                            </div>
+                        </div>
+                    </label>
+                </div>
+                <!-- Option C -->
+                <div class="border-2 border-gray-200 rounded-lg p-4 hover:border-blue-500 transition">
+                    <div class="font-semibold text-lg mb-1">❓ Je ne connais pas ma consommation</div>
+                    <p class="text-sm text-gray-600 mb-3">Choisissez votre calculateur</p>
+                    <div class="flex flex-wrap gap-2">
+                        <a href="{% url 'frontend:consumption_calculator' %}" target="_blank"
+                           class="inline-flex items-center px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition">
+                            ⚡ Rapide (2 min)
+                        </a>
+                        <a href="{% url 'frontend:consumption_calculator_expert' %}" target="_blank"
+                           class="inline-flex items-center px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition">
+                            🎯 Expert (5 min)
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <input type="hidden" id="consommation_finale" name="consommation_finale" value="">
+            <div class="flex gap-4">
+                <button type="button" onclick="goBackFromStep3a()"
+                        class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
+                    <i class="fas fa-arrow-left mr-2"></i> Retour
+                </button>
+                <button type="button" onclick="nextStepTo4a()"
+                        class="flex-1 px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition font-semibold text-lg">
+                    Continuer <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- ══════════════ ÉTAPE 3B : INSTALLATION (vente totale) ══════════════ -->
+        <div class="form-section hidden" id="section-3b">
+            <h2 class="text-2xl font-bold mb-6 flex items-center">
+                <span class="w-10 h-10 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full flex items-center justify-center text-white mr-3">3</span>
+                🏗️ Paramètres de votre installation
+            </h2>
+            <p class="text-gray-600 mb-6">Ces informations permettent de calculer la puissance installable et les revenus prévisionnels.</p>
+
+            <!-- Type d'installation -->
+            <div class="bg-gray-50 p-6 rounded-lg mb-6">
+                <h3 class="font-bold mb-4">🏗️ Type d'installation</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="border-2 border-blue-500 bg-blue-50 rounded-lg p-4 cursor-pointer text-center"
+                         onclick="selectTypeInstallation('toiture')" data-value="toiture" id="ti-toiture">
+                        <div class="text-3xl mb-2">🏠</div>
+                        <div class="font-semibold text-sm">En toiture</div>
+                        <div class="text-xs text-gray-500 mt-1">Sur la toiture de votre bâtiment</div>
+                    </div>
+                    <div class="border-2 border-gray-200 rounded-lg p-4 cursor-pointer text-center hover:border-green-400 transition"
+                         onclick="selectTypeInstallation('sol')" data-value="sol" id="ti-sol">
+                        <div class="text-3xl mb-2">🌿</div>
+                        <div class="font-semibold text-sm">Au sol</div>
+                        <div class="text-xs text-gray-500 mt-1">Sur terrain disponible</div>
+                    </div>
+                    <div class="border-2 border-gray-200 rounded-lg p-4 cursor-pointer text-center hover:border-purple-400 transition"
+                         onclick="selectTypeInstallation('ombriere')" data-value="ombriere" id="ti-ombriere">
+                        <div class="text-3xl mb-2">🚗</div>
+                        <div class="font-semibold text-sm">Ombrière</div>
+                        <div class="text-xs text-gray-500 mt-1">Parking ou espace couvert</div>
+                    </div>
+                </div>
+                <input type="hidden" name="type_installation" id="id_type_installation" value="toiture">
+            </div>
+
+            <!-- Surface + type toiture (visible seulement si toiture) -->
+            <div class="bg-gray-50 p-6 rounded-lg mb-6">
+                <h3 class="font-bold mb-4">📐 Surface et caractéristiques</h3>
+                <div class="grid md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Surface disponible (m²)</label>
+                        <input type="number" id="surface_vente" min="1" max="10000" step="1" placeholder="Ex : 200"
+                               class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500">
+                        <p class="text-xs text-gray-500 mt-1">Surface totale utilisable pour les panneaux</p>
+                        <p id="roof-prefill-notice-vente" class="text-xs text-green-600 mt-1 hidden">
+                            📐 Valeur calculée depuis votre dessin de toiture
+                        </p>
+                    </div>
+                    <div id="type-toiture-vente-box">
+                        <label class="block text-sm font-semibold mb-2">🏠 Type de toiture</label>
+                        <select id="type_toiture_vente" class="w-full px-4 py-3 rounded-lg border border-gray-300">
+                            <option value="tuiles">Tuiles</option>
+                            <option value="ardoise">Ardoise</option>
+                            <option value="zinc">Zinc</option>
+                            <option value="beton">Béton</option>
+                            <option value="tole">Tôle</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Orientation</label>
+                        <select id="orientation_vente" class="w-full px-4 py-3 rounded-lg border border-gray-300">
+                            <option value="S" selected>Sud</option>
+                            <option value="SE">Sud-Est</option>
+                            <option value="SW">Sud-Ouest</option>
+                            <option value="E">Est</option>
+                            <option value="EW">Est/Ouest (réparti)</option>
+                            <option value="W">Ouest</option>
+                            <option value="NE">Nord-Est</option>
+                            <option value="NW">Nord-Ouest</option>
+                            <option value="N">Nord</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">production maximale en orientation sud en France</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Inclinaison (°)</label>
+                        <input type="number" id="inclinaison_vente" value="30" min="0" max="90"
+                               class="w-full px-4 py-3 rounded-lg border border-gray-300">
+                        <p class="text-xs text-gray-500 mt-1">une inclinaison de 30° environ est optimale en France</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ombrage vente -->
+            <div class="bg-gray-50 p-6 rounded-lg mb-6">
+                <h3 class="font-bold mb-2">🌳 Ombrage</h3>
+                <p class="text-sm text-gray-600 mb-4">Estimez l'ombre portée sur vos panneaux</p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3" id="ombrage-options">
+                    <div class="ombrage-option border-2 border-green-500 bg-green-50 rounded-lg p-3 text-center"
+                         onclick="selectOmbrage(0)" data-value="0">
+                        <div class="text-2xl mb-1">☀️</div>
+                        <div class="font-semibold text-sm">Aucun</div>
+                        <div class="text-xs text-gray-500">Dégagé, pas d'ombre</div>
+                        <div class="text-xs font-bold text-green-700 mt-1">0%</div>
+                    </div>
+                    <div class="ombrage-option border-2 border-gray-200 rounded-lg p-3 text-center hover:border-yellow-400 transition"
+                         onclick="selectOmbrage(10)" data-value="10">
+                        <div class="text-2xl mb-1">🌤️</div>
+                        <div class="font-semibold text-sm">Léger</div>
+                        <div class="text-xs text-gray-500">Cheminée, antenne</div>
+                        <div class="text-xs font-bold text-yellow-600 mt-1">-10%</div>
+                    </div>
+                    <div class="ombrage-option border-2 border-gray-200 rounded-lg p-3 text-center hover:border-orange-400 transition"
+                         onclick="selectOmbrage(20)" data-value="20">
+                        <div class="text-2xl mb-1">⛅</div>
+                        <div class="font-semibold text-sm">Modéré</div>
+                        <div class="text-xs text-gray-500">Arbre ou bâtiment proche</div>
+                        <div class="text-xs font-bold text-orange-600 mt-1">-20%</div>
+                    </div>
+                    <div class="ombrage-option border-2 border-gray-200 rounded-lg p-3 text-center hover:border-red-400 transition"
+                         onclick="selectOmbrage(30)" data-value="30">
+                        <div class="text-2xl mb-1">🌥️</div>
+                        <div class="font-semibold text-sm">Important</div>
+                        <div class="text-xs text-gray-500">Grands arbres, immeuble</div>
+                        <div class="text-xs font-bold text-red-600 mt-1">-30%</div>
+                    </div>
+                </div>
+                <input type="hidden" id="id_facteur_ombrage_3b" value="0">
+            </div>
+
+            <div class="flex gap-4">
+                <button type="button" onclick="goBackFromStep3b()"
+                        class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
+                    <i class="fas fa-arrow-left mr-2"></i> Retour
+                </button>
+                <button type="button" onclick="calculerConfiguration()"
+                        class="flex-1 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg hover:shadow-lg transition font-semibold">
+                    Calculer la configuration optimale <i class="fas fa-calculator ml-2"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- ══════════════ ÉTAPE 4A : TOITURE (autoconso) ══════════════ -->
+        <div class="form-section hidden" id="section-4a">
+            <h2 class="text-2xl font-bold mb-6 flex items-center">
+                <span class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white mr-3">4</span>
+                🏠 Paramètres de votre toiture
+            </h2>
+
+            <!-- Surface + type toiture -->
+            <div class="bg-gray-50 p-6 rounded-lg mb-6">
+                <h3 class="font-bold mb-4">📐 Surface et type de toiture</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">🏠 Surface disponible (m²)</label>
+                        <input type="number" id="surface_autoconso" min="1" max="5000" step="1" placeholder="Ex : 40"
+                               class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500">
+                        <p class="text-xs text-gray-500 mt-1">m² disponibles pour les panneaux</p>
+                        <p id="roof-prefill-notice-auto" class="text-xs text-green-600 mt-1 hidden">
+                            📐 Valeur calculée depuis votre dessin de toiture
+                        </p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">🏠 Type de toiture</label>
+                        <select id="type_toiture_autoconso" class="w-full px-4 py-3 rounded-lg border border-gray-300">
+                            <option value="tuiles">Tuiles</option>
+                            <option value="ardoise">Ardoise</option>
+                            <option value="zinc">Zinc</option>
+                            <option value="beton">Béton</option>
+                            <option value="tole">Tôle</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Impact le coût de pose</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Orientation + Inclinaison -->
+            <div class="bg-gray-50 p-6 rounded-lg mb-6">
+                <h3 class="font-bold mb-4">🧭 Orientation et inclinaison</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Orientation</label>
+                        <select id="orientation_autoconso" onchange="document.getElementById('id_orientation').value=this.value"
+                                class="w-full px-4 py-3 rounded-lg border border-gray-300">
+                            <option value="S" selected>Sud (optimal)</option>
+                            <option value="SE">Sud-Est</option>
+                            <option value="SW">Sud-Ouest</option>
+                            <option value="E">Est</option>
+                            <option value="EW">Est/Ouest (réparti)</option>
+                            <option value="W">Ouest</option>
+                            <option value="NE">Nord-Est</option>
+                            <option value="NW">Nord-Ouest</option>
+                            <option value="N">Nord</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Est/Ouest : panneaux répartis de chaque côté</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Inclinaison (°)</label>
+                        <input type="number" id="inclinaison_autoconso" value="30" min="0" max="90" onchange="document.getElementById('id_inclinaison').value=this.value"
+                               class="w-full px-4 py-3 rounded-lg border border-gray-300">
+                        <p class="text-xs text-gray-500 mt-1">30° optimal en France</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ombrage autoconso -->
+            <div class="bg-gray-50 p-6 rounded-lg mb-6">
+                <h3 class="font-bold mb-2">🌳 Ombrage sur les panneaux</h3>
+                <p class="text-sm text-gray-600 mb-4">Estimez le niveau d'ombre portée sur vos panneaux</p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3" id="ombrage-options-4a">
+                    <div class="ombrage-option-4a border-2 border-green-500 bg-green-50 rounded-lg p-3 text-center cursor-pointer"
+                         onclick="selectOmbrage4a(0)" data-value="0">
+                        <div class="text-2xl mb-1">☀️</div>
+                        <div class="font-semibold text-sm">Aucun</div>
+                        <div class="text-xs text-gray-500">Dégagé, pas d'ombre</div>
+                        <div class="text-xs font-bold text-green-700 mt-1">0%</div>
+                    </div>
+                    <div class="ombrage-option-4a border-2 border-gray-200 rounded-lg p-3 text-center cursor-pointer hover:border-yellow-400 transition"
+                         onclick="selectOmbrage4a(10)" data-value="10">
+                        <div class="text-2xl mb-1">🌤️</div>
+                        <div class="font-semibold text-sm">Léger</div>
+                        <div class="text-xs text-gray-500">Cheminée, antenne</div>
+                        <div class="text-xs font-bold text-yellow-600 mt-1">-10%</div>
+                    </div>
+                    <div class="ombrage-option-4a border-2 border-gray-200 rounded-lg p-3 text-center cursor-pointer hover:border-orange-400 transition"
+                         onclick="selectOmbrage4a(20)" data-value="20">
+                        <div class="text-2xl mb-1">⛅</div>
+                        <div class="font-semibold text-sm">Modéré</div>
+                        <div class="text-xs text-gray-500">Arbre ou bâtiment proche</div>
+                        <div class="text-xs font-bold text-orange-600 mt-1">-20%</div>
+                    </div>
+                    <div class="ombrage-option-4a border-2 border-gray-200 rounded-lg p-3 text-center cursor-pointer hover:border-red-400 transition"
+                         onclick="selectOmbrage4a(30)" data-value="30">
+                        <div class="text-2xl mb-1">🌥️</div>
+                        <div class="font-semibold text-sm">Important</div>
+                        <div class="text-xs text-gray-500">Grands arbres, immeuble</div>
+                        <div class="text-xs font-bold text-red-600 mt-1">-30%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <button type="button" onclick="goBackFromStep4a()"
+                        class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
+                    <i class="fas fa-arrow-left mr-2"></i> Retour
+                </button>
+                <button type="button" onclick="calculerConfiguration()"
+                        class="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition font-semibold">
+                    Calculer la configuration optimale <i class="fas fa-calculator ml-2"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- ══════════════ ÉTAPE 5 : CONFIGURATION ══════════════ -->
+        <div class="form-section hidden" id="section-5">
+            <h2 class="text-2xl font-bold mb-6 flex items-center">
+                <span class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white mr-3" id="step5-circle">5</span>
+                ⚙️ Configuration de votre installation
+            </h2>
+
+            <!-- Puissance recommandée -->
+            <div class="config-result mb-6">
+                <h3 class="text-2xl font-bold mb-4 text-center">💡 Puissance recommandée</h3>
+                <div class="text-center mb-4">
+                    <div class="text-6xl font-bold" id="puissance-recommandee">--.-- kWc</div>
+                    <p class="text-sm text-gray-200 mt-2">
+                        soit environ <span id="nb-panneaux">--</span> panneaux de 400 Wc
+                    </p>
+                </div>
+                <!-- Métriques autoconso -->
+                <div id="metrics-autoconso" class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                    <div class="config-metric text-center">
+                        <div class="text-2xl font-bold" id="metric-production">--</div>
+                        <div class="text-xs opacity-80">kWh/an produits</div>
+                    </div>
+                    <div class="config-metric text-center">
+                        <div class="text-2xl font-bold" id="metric-autoconso">--%</div>
+                        <div class="text-xs opacity-80">Couverture besoins*</div>
+                    </div>
+                    <div class="config-metric text-center">
+                        <div class="text-2xl font-bold" id="metric-economie">-- €</div>
+                        <div class="text-xs opacity-80">Économie/an</div>
+                    </div>
+                    <div class="config-metric text-center">
+                        <div class="text-2xl font-bold" id="metric-roi">-- ans</div>
+                        <div class="text-xs opacity-80">Retour invest.</div>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-300 mt-2 text-center">* Estimation ”” le taux réel sera calculé précisément lors de la simulation</p>
+                <!-- Métriques vente totale -->
+                <div id="metrics-vente-totale" class="hidden mt-4">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div class="config-metric text-center">
+                            <div class="text-2xl font-bold" id="vt-production">--</div>
+                            <div class="text-xs opacity-80">kWh/an produits</div>
+                        </div>
+                        <div class="config-metric text-center">
+                            <div class="text-2xl font-bold" id="vt-tarif">--</div>
+                            <div class="text-xs opacity-80">€/kWh rachat</div>
+                        </div>
+                        <div class="config-metric text-center">
+                            <div class="text-2xl font-bold" id="vt-revenu">-- €</div>
+                            <div class="text-xs opacity-80">Revenu/an</div>
+                        </div>
+                        <div class="config-metric text-center">
+                            <div class="text-2xl font-bold" id="vt-roi">-- ans</div>
+                            <div class="text-xs opacity-80">Retour invest.</div>
+                        </div>
+                    </div>
+                    <div class="mt-3 p-3 bg-orange-500 bg-opacity-30 rounded-lg text-sm">
+                        <strong>⚠️ Rappel :</strong> En vente totale, vous ne consommez pas votre production ””
+                        elle est intégralement vendue à EDF OA avec un <strong>tarif garanti pendant 20 ans</strong>.
+                        Votre facture d'électricité reste identique.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Paramètres techniques -->
+            <div class="bg-gray-50 p-6 rounded-lg mb-6">
+                <h3 class="font-bold mb-4">⚙️ Paramètres techniques</h3>
+                <div class="grid md:grid-cols-2 gap-4 mb-4">
+                    <!-- Puissance -->
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Puissance <span id="lock-icon">🔒</span></label>
+                        <input type="number" name="puissance_kw" id="puissance_kw" step="0.5" min="1" max="100"
+                               class="w-full px-4 py-3 rounded-lg border border-gray-300" readonly>
+                        <p class="text-xs text-gray-500 mt-1">kWc (kilowatt-crête)</p>
+                    </div>
+                    <!-- Champs cachés synchronisés -->
+                    <div class="bg-blue-50 p-4 rounded-lg text-sm text-blue-800 flex items-center">
+                        💡 Puissance calculée automatiquement. Cochez "Personnaliser" ci-dessous pour modifier.
+                    </div>
+                </div>
+
+                <!-- Champs cachés du formulaire (synchronisés par JS) -->
+                <input type="hidden" name="surface_toiture_m2" id="id_surface_toiture_m2">
+                <input type="hidden" name="type_toiture" id="id_type_toiture">
+                <input type="hidden" name="orientation" id="id_orientation" value="S">
+                <input type="hidden" name="inclinaison" id="id_inclinaison" value="30">
+
+                <!-- Toggle personnalisation -->
+                <div class="mt-2">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="toggle-perso" onchange="togglePersonnalisation()" class="mr-3">
+                        <span class="text-sm">🎛️ Je veux personnaliser la puissance</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Type de panneaux -->
+            <div class="bg-gray-50 p-6 rounded-lg mb-6">
+                <h3 class="font-bold mb-2">☀️ Type de panneaux solaires</h3>
+                <p class="text-sm text-gray-600 mb-4">Le type de panneau impacte le rendement et la puissance installable sur votre surface.</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3" id="panneau-options">
+                    <div class="panneau-option border-2 border-blue-500 bg-blue-50 rounded-lg p-4 cursor-pointer"
+                         onclick="selectPanneau('monocristallin_standard')" data-value="monocristallin_standard">
+                        <div class="text-2xl mb-2 text-center">⬛</div>
+                        <div class="font-semibold text-sm text-center">Monocristallin Standard</div>
+                        <div class="text-xs text-gray-500 mt-2">Rendement ~20-21%. Solution économique et fiable. Le plus répandu.</div>
+                        <div class="text-xs font-bold text-blue-700 mt-2 text-center">~6,5 m²/kWc</div>
+                    </div>
+                    <div class="panneau-option border-2 border-gray-200 rounded-lg p-4 cursor-pointer hover:border-purple-400 transition"
+                         onclick="selectPanneau('topcon_hjt')" data-value="topcon_hjt">
+                        <div class="text-2xl mb-2 text-center">🔬</div>
+                        <div class="font-semibold text-sm text-center">TOPCon / HJT</div>
+                        <div class="text-xs text-gray-500 mt-2">Rendement ~22-24%. Haute performance, idéal surface limitée.</div>
+                        <div class="text-xs font-bold text-purple-700 mt-2 text-center">~5,5 m²/kWc</div>
+                    </div>
+                    <div class="panneau-option border-2 border-gray-200 rounded-lg p-4 cursor-pointer hover:border-teal-400 transition"
+                         onclick="selectPanneau('bifacial')" data-value="bifacial">
+                        <div class="text-2xl mb-2 text-center">🔷</div>
+                        <div class="font-semibold text-sm text-center">Bifacial</div>
+                        <div class="text-xs text-gray-500 mt-2">Rendement ~21-23% + gain face arrière. Idéal toiture claire ou sol.</div>
+                        <div class="text-xs font-bold text-teal-700 mt-2 text-center">~6,0 m²/kWc</div>
+                    </div>
+                </div>
+                <input type="hidden" name="type_panneau" id="id_type_panneau" value="monocristallin_standard">
+            </div>
+
+            <!-- Ombrage (affiché en étape 5 pour les 2 modes) -->
+            <div class="bg-gray-50 p-6 rounded-lg mb-6">
+                <h3 class="font-bold mb-2">🌳 Ombrage sur les panneaux</h3>
+                <p class="text-sm text-gray-600 mb-4">Estimez le niveau d'ombre portée</p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3" id="ombrage-options">
+                    <div class="ombrage-option border-2 border-green-500 bg-green-50 rounded-lg p-3 text-center cursor-pointer"
+                         onclick="selectOmbrage(0)" data-value="0">
+                        <div class="text-2xl mb-1">☀️</div>
+                        <div class="font-semibold text-sm">Aucun</div>
+                        <div class="text-xs text-gray-500">Dégagé, pas d'ombre</div>
+                        <div class="text-xs font-bold text-green-700 mt-1">0%</div>
+                    </div>
+                    <div class="ombrage-option border-2 border-gray-200 rounded-lg p-3 text-center cursor-pointer hover:border-yellow-400 transition"
+                         onclick="selectOmbrage(10)" data-value="10">
+                        <div class="text-2xl mb-1">🌤️</div>
+                        <div class="font-semibold text-sm">Léger</div>
+                        <div class="text-xs text-gray-500">Cheminée, antenne</div>
+                        <div class="text-xs font-bold text-yellow-600 mt-1">-10%</div>
+                    </div>
+                    <div class="ombrage-option border-2 border-gray-200 rounded-lg p-3 text-center cursor-pointer hover:border-orange-400 transition"
+                         onclick="selectOmbrage(20)" data-value="20">
+                        <div class="text-2xl mb-1">⛅</div>
+                        <div class="font-semibold text-sm">Modéré</div>
+                        <div class="text-xs text-gray-500">Arbre ou bâtiment proche</div>
+                        <div class="text-xs font-bold text-orange-600 mt-1">-20%</div>
+                    </div>
+                    <div class="ombrage-option border-2 border-gray-200 rounded-lg p-3 text-center cursor-pointer hover:border-red-400 transition"
+                         onclick="selectOmbrage(30)" data-value="30">
+                        <div class="text-2xl mb-1">🌥️</div>
+                        <div class="font-semibold text-sm">Important</div>
+                        <div class="text-xs text-gray-500">Grands arbres, immeuble</div>
+                        <div class="text-xs font-bold text-red-600 mt-1">-30%</div>
+                    </div>
+                </div>
+                <input type="hidden" name="facteur_ombrage" id="id_facteur_ombrage" value="0">
+            </div>
+
+            <!-- Type d'onduleur -->
+            <div class="bg-gray-50 p-6 rounded-lg mb-6">
+                <h3 class="font-bold mb-2">🔌 Type d'onduleur</h3>
+                <p class="text-sm text-gray-600 mb-4">L'onduleur convertit le courant des panneaux en électricité utilisable.</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3" id="onduleur-options">
+                    <div class="onduleur-option border-2 border-blue-500 bg-blue-50 rounded-lg p-4 cursor-pointer"
+                         onclick="selectOnduleur('string')" data-value="string">
+                        <div class="text-2xl mb-2 text-center">🔲</div>
+                        <div class="font-semibold text-sm text-center">Onduleur central</div>
+                        <div class="text-xs text-gray-500 mt-2">Un seul boîtier au mur. Solution économique, idéale pour toiture simple sans ombre.</div>
+                    </div>
+                    <div class="onduleur-option border-2 border-gray-200 rounded-lg p-4 cursor-pointer hover:border-purple-400 transition"
+                         onclick="selectOnduleur('micro')" data-value="micro">
+                        <div class="text-2xl mb-2 text-center">🔳🔳🔳</div>
+                        <div class="font-semibold text-sm text-center">Micro-onduleurs</div>
+                        <div class="text-xs text-gray-500 mt-2">Un par panneau, chacun indépendant. Idéal en cas d'ombrage ou orientation Est/Ouest.</div>
+                    </div>
+                    <div class="onduleur-option border-2 border-gray-200 rounded-lg p-4 cursor-pointer hover:border-teal-400 transition"
+                         onclick="selectOnduleur('optimiseurs')" data-value="optimiseurs">
+                        <div class="text-2xl mb-2 text-center">🔲 + ⚙️</div>
+                        <div class="font-semibold text-sm text-center">Central + optimiseurs</div>
+                        <div class="text-xs text-gray-500 mt-2">Onduleur central avec optimiseur sous chaque panneau (ex: SolarEdge). Très haut rendement.</div>
+                    </div>
+                </div>
+                <div id="onduleur-ombrage-info" class="hidden mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p class="text-sm text-amber-800">💡 <strong>Conseil :</strong> Vous avez indiqué un ombrage. Les micro-onduleurs ou les optimiseurs limitent l'impact de l'ombre aux seuls panneaux concernés.</p>
+                </div>
+                <input type="hidden" name="type_onduleur" id="id_type_onduleur" value="string">
+            </div>
+
+            <!-- Batterie (autoconso uniquement) -->
+            <div id="batterie-section" class="bg-blue-50 p-4 rounded-lg mb-6 hidden">
+                <label class="flex items-center cursor-pointer">
+                    <input type="checkbox" id="avec_batterie" name="avec_batterie" class="mr-3">
+                    <div>
+                        <span class="font-semibold">🔋 Ajouter une batterie de stockage</span>
+                        <p class="text-sm text-gray-600">Optimise l'autoconsommation</p>
+                    </div>
+                </label>
+            </div>
+
+            <!-- Coût installation -->
+            <div class="mt-2 mb-6 p-5 bg-white/80 backdrop-blur rounded-xl border border-gray-200">
+                <h4 class="font-bold text-gray-800 mb-3 flex items-center">
+                    💶 Coût de l'installation
+                    <span class="relative group ml-2 cursor-help">
+                        <i class="fas fa-info-circle text-gray-400 text-sm"></i>
+                        <span id="cout-tooltip-text"
+                              class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-3
+                                     bg-gray-900 text-white text-xs rounded-lg shadow-lg
+                                     opacity-0 group-hover:opacity-100 transition-opacity duration-200
+                                     pointer-events-none z-50">
+                        </span>
+                    </span>
+                </h4>
+                <div class="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
+                    <button type="button" id="btn-cout-auto" onclick="setCoutMode('auto')"
+                            class="flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all bg-blue-600 text-white shadow">
+                        📊 Estimation auto
+                    </button>
+                    <button type="button" id="btn-cout-manuel" onclick="setCoutMode('manuel')"
+                            class="flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all bg-white text-gray-600 border border-gray-300 hover:bg-gray-100">
+                        ✏️ J'ai un devis
+                    </button>
+                </div>
+                <!-- Mode AUTO -->
+                <div id="cout-mode-auto">
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Coût par kWc</span>
+                            <span class="font-semibold"><span id="cout-kwc-estime">-</span> €/kWc</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Coût brut installation</span>
+                            <span class="font-semibold"><span id="cout-estime">-</span> €</span>
+                        </div>
+                        <div id="prime-row" class="flex justify-between text-green-600" style="display:none;">
+                            <span>Prime autoconsommation</span>
+                            <span class="font-semibold">- <span id="prime-estime">0</span> €</span>
+                        </div>
+                        <div class="flex justify-between pt-2 border-t border-gray-300">
+                            <span class="text-gray-800 font-bold">Coût net estimé</span>
+                            <span class="font-bold text-lg text-blue-700"><span id="cout-net-estime">-</span> €</span>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2">Estimation basée sur les prix moyens du marché français 2025-2026.</p>
+                </div>
+                <!-- Mode MANUEL -->
+                <div id="cout-mode-manuel" class="hidden">
+                    <label class="block text-sm text-gray-600 mb-2">Montant de votre devis (€ TTC, hors primes)</label>
+                    <div class="relative">
+                        <input type="number" id="cout-manuel-input" min="1000" max="200000" step="100"
+                               placeholder="Ex : 15 300" oninput="updateCoutManuel()"
+                               class="w-full px-4 py-3 pr-12 border-2 border-gray-300 rounded-xl text-lg font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition">
+                        <span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">€</span>
+                    </div>
+                    <div id="cout-manuel-detail" class="mt-3 space-y-2 text-sm hidden">
+                        <div id="prime-row-manuel" class="flex justify-between text-green-600" style="display:none;">
+                            <span>Prime autoconsommation</span>
+                            <span class="font-semibold">- <span id="prime-estime-manuel">0</span> €</span>
+                        </div>
+                        <div class="flex justify-between pt-2 border-t border-gray-300">
+                            <span class="text-gray-800 font-bold">Coût net</span>
+                            <span class="font-bold text-lg text-blue-700"><span id="cout-net-manuel">-</span> €</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Champ caché coût final -->
+            <input type="hidden" name="cout_installation_personnalise" id="cout_installation_final" value="">
+            <input type="hidden" name="puissance_personnalisee" id="puissance_personnalisee_flag" value="0">
+
+            <!-- Boutons -->
+            <div class="flex gap-4 mt-6">
+                <button type="button" onclick="retourDepuisStep5()"
+                        class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
+                    <i class="fas fa-arrow-left mr-2"></i> Retour
+                </button>
+                <button type="submit" id="submit-button"
+                        class="flex-1 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:shadow-lg transition text-lg font-bold">
+                    🚀 Lancer la simulation détaillée
+                </button>
+            </div>
+        </div>
+
+    </form>
+</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════
+// VARIABLES GLOBALES
+// ═══════════════════════════════════════════════════════════
+let currentStep = 1;
+let map, marker;
+let consoData = null;
+let hasConsumptionProfile = false;
+let coutMode = 'auto';
+let coutAutoValue = 0;
+let primeAutoValue = 0;
+let modePrincipal = '';  // 'autoconso' ou 'vente'
+
+{% if prefill_data %}
+consoData = {{ prefill_data|safe }};
+hasConsumptionProfile = true;
+{% endif %}
+
+{% if has_consumption_profile %}
+hasConsumptionProfile = true;
+{% endif %}
+
+const customIcon = L.icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+    iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+});
+
+// ═══════════════════════════════════════════════════════════
+// INDICATEUR D'ÉTAPES DYNAMIQUE
+// ═══════════════════════════════════════════════════════════
+function updateStepIndicator(mode) {
+    const step3a = document.getElementById('step-3a');
+    const step3b = document.getElementById('step-3b');
+    const step4a = document.getElementById('step-4a');
+    const step5num = document.getElementById('step5-num');
+    const step5circle = document.getElementById('step5-circle');
+
+    if (mode === 'autoconso') {
+        step3a.classList.remove('hidden-step');
+        step3b.classList.add('hidden-step');
+        step4a.classList.remove('hidden-step');
+        if (step5num) step5num.textContent = '5';
+        if (step5circle) step5circle.textContent = '5';
+    } else {
+        step3a.classList.add('hidden-step');
+        step3b.classList.remove('hidden-step');
+        step4a.classList.add('hidden-step');
+        if (step5num) step5num.textContent = '4';
+        if (step5circle) step5circle.textContent = '4';
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════
+function showSection(id) {
+    document.querySelectorAll('.form-section').forEach(s => s.classList.add('hidden'));
+    document.getElementById('section-' + id).classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function setStepActive(id) {
+    const el = document.getElementById('step-' + id);
+    if (el) { el.classList.add('active'); el.classList.remove('completed'); }
+}
+function setStepCompleted(id) {
+    const el = document.getElementById('step-' + id);
+    if (el) { el.classList.remove('active'); el.classList.add('completed'); }
+    // Colorer le connecteur suivant
+    const connMap = { '1': 'conn-1-2', '2': 'conn-2-3', '3a': 'conn-2-3', '3b': 'conn-2-3', '4a': 'conn-4-5' };
+    const conn = document.getElementById(connMap[id] || 'conn-' + id + '-' + (parseInt(id)+1));
+    if (conn) conn.classList.add('done');
+}
+function setStepInactive(id) {
+    const el = document.getElementById('step-' + id);
+    if (el) { el.classList.remove('active', 'completed'); }
+}
+
+function nextStep(step) {
+    if (currentStep === 1 && !document.getElementById('latitude-input').value) {
+        alert('⚠️ Veuillez sélectionner une localisation sur la carte');
+        return;
+    }
+    setStepCompleted(currentStep);
+    currentStep = step;
+    setStepActive(step);
+    showSection(step);
+}
+
+function prevStep(step) {
+    setStepInactive(currentStep);
+    currentStep = step;
+    setStepActive(step);
+    setStepInactive(step); // pas completed
+    showSection(step);
+}
+
+// Depuis étape 2 → 3A (autoconso) ou 3B (vente)
+function goFromStep2() {
+    const mode = document.getElementById('mode_principal').value;
+    if (!mode) { alert('⚠️ Veuillez choisir un objectif principal'); return; }
+    if (mode === 'autoconso' && !document.getElementById('objectif_choisi').value) {
+        alert('⚠️ Veuillez choisir votre priorité (Rentabilité, Équilibre ou Autonomie)');
+        return;
+    }
+    setStepCompleted(2);
+    if (mode === 'autoconso') {
+        currentStep = '3a';
+        setStepActive('3a');
+        showSection('3a');
+    } else {
+        currentStep = '3b';
+        setStepActive('3b');
+        showSection('3b');
+    }
+}
+
+function goBackFromStep3a() {
+    setStepInactive('3a');
+    currentStep = 2;
+    setStepInactive(2);
+    showSection(2);
+}
+
+function goBackFromStep3b() {
+    setStepInactive('3b');
+    currentStep = 2;
+    setStepInactive(2);
+    showSection(2);
+}
+
+// Depuis étape 3A → 4A
+function nextStepTo4a() {
+    const option = document.querySelector('input[name="conso_option"]:checked');
+    if (!option) { alert('⚠️ Veuillez sélectionner une option de consommation'); return; }
+    if (option.value === 'analysee') {
+        if (!consoData || !consoData.consommation_annuelle) {
+            alert('⚠️ Données de consommation non trouvées. Veuillez créer votre profil.'); return;
+        }
+        if (!hasConsumptionProfile) {
+            alert('⚠️ Veuillez créer votre profil de consommation.'); return;
+        }
+        document.getElementById('consommation_finale').value = consoData.consommation_annuelle;
+    } else if (option.value === 'manuelle') {
+        if (!hasConsumptionProfile) {
+            alert('⚠️ Pour continuer, veuillez créer votre profil de consommation.');
+            const link = document.getElementById('detailed-consumption-link');
+            if (link) { link.classList.add('animate-pulse', 'ring-4', 'ring-amber-400'); link.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+            return;
+        }
+        const input = document.getElementById('consommation_annuelle');
+        if (!input || !input.value || input.value < 1000) {
+            alert('⚠️ Veuillez saisir votre consommation (≥ 1000 kWh/an)'); return;
+        }
+        document.getElementById('consommation_finale').value = input.value;
+    }
+    setStepCompleted('3a');
+    currentStep = '4a';
+    setStepActive('4a');
+    showSection('4a');
+}
+
+function goBackFromStep4a() {
+    setStepInactive('4a');
+    currentStep = '3a';
+    setStepInactive('3a');
+    showSection('3a');
+}
+
+// Retour depuis étape 5
+function retourDepuisStep5() {
+    setStepInactive(5);
+    if (modePrincipal === 'autoconso') {
+        currentStep = '4a';
+        setStepInactive('4a');
+        showSection('4a');
+    } else {
+        currentStep = '3b';
+        setStepInactive('3b');
+        showSection('3b');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// SÉLECTION MODE PRINCIPAL
+// ═══════════════════════════════════════════════════════════
+function selectMode(mode) {
+    modePrincipal = mode;
+    document.getElementById('mode_principal').value = mode;
+    document.getElementById('mode-autoconso').className = 'mode-card' + (mode === 'autoconso' ? ' selected-autoconso' : '');
+    document.getElementById('mode-vente').className = 'mode-card' + (mode === 'vente' ? ' selected-vente' : '');
+    const sousObj = document.getElementById('sous-objectifs');
+    if (mode === 'autoconso') {
+        sousObj.classList.remove('hidden');
+        document.getElementById('objectif_choisi').value = '';
+    } else {
+        sousObj.classList.add('hidden');
+        document.getElementById('objectif_choisi').value = 'revente';
+    }
+    updateStepIndicator(mode);
+}
+
+// ═══════════════════════════════════════════════════════════
+// SÉLECTION OBJECTIF (autoconso)
+// ═══════════════════════════════════════════════════════════
+function selectObjectif(obj) {
+    document.querySelectorAll('.objectif-card').forEach(el => el.classList.remove('selected'));
+    const el = document.getElementById('obj-' + obj);
+    if (el) el.classList.add('selected');
+    document.getElementById('objectif_choisi').value = obj;
+}
+
+// ═══════════════════════════════════════════════════════════
+// SÉLECTION CONSOMMATION
+// ═══════════════════════════════════════════════════════════
+function selectConsoOption(option) {
+    document.querySelectorAll('input[name="conso_option"]').forEach(el => el.checked = false);
+    const radio = document.querySelector(`input[name="conso_option"][value="${option}"]`);
+    if (radio) radio.checked = true;
+    document.getElementById('conso-analysee-details').classList.add('hidden');
+    document.getElementById('conso-manuelle-input').classList.add('hidden');
+    if (option === 'analysee') {
+        document.getElementById('conso-analysee-details').classList.remove('hidden');
+        if (consoData) document.getElementById('consommation_finale').value = consoData.consommation_annuelle;
+    } else if (option === 'manuelle') {
+        document.getElementById('conso-manuelle-input').classList.remove('hidden');
+    }
+}
+
+// Mise à jour conso manuelle
+const consoInput = document.getElementById('consommation_annuelle');
+if (consoInput) {
+    consoInput.addEventListener('input', function() {
+        document.getElementById('consommation_finale').value = this.value;
+    });
+}
+
+// ═══════════════════════════════════════════════════════════
+// TYPE INSTALLATION (vente)
+// ═══════════════════════════════════════════════════════════
+function selectTypeInstallation(value) {
+    document.getElementById('id_type_installation').value = value;
+    ['toiture','sol','ombriere'].forEach(v => {
+        const el = document.getElementById('ti-' + v);
+        if (!el) return;
+        el.classList.remove('border-blue-500','bg-blue-50','border-green-500','bg-green-50','border-purple-500','bg-purple-50');
+        el.classList.add('border-gray-200');
+    });
+    const colors = { toiture: 'blue', sol: 'green', ombriere: 'purple' };
+    const c = colors[value] || 'blue';
+    const sel = document.getElementById('ti-' + value);
+    if (sel) { sel.classList.remove('border-gray-200'); sel.classList.add(`border-${c}-500`, `bg-${c}-50`); }
+
+    // Montrer/masquer type de toiture selon le type d'installation
+    const toitureBox = document.getElementById('type-toiture-vente-box');
+    if (toitureBox) {
+        toitureBox.style.display = value === 'toiture' ? '' : 'none';
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// CALCUL CONFIGURATION (appel AJAX → step 5)
+// ═══════════════════════════════════════════════════════════
+function calculerConfiguration() {
+    const mode = modePrincipal;
+    const objectif = document.getElementById('objectif_choisi').value;
+    const conso = parseFloat(document.getElementById('consommation_finale')?.value || 5000);
+    const batterie = document.getElementById('avec_batterie')?.checked || false;
+    const latitude = parseFloat(document.getElementById('latitude-input').value);
+
+    // Récupérer surface + params selon le mode
+    let surface, orientation, inclinaison, typeToiture;
+    if (mode === 'autoconso') {
+        surface = parseFloat(document.getElementById('surface_autoconso').value) || 0;
+        orientation = document.getElementById('id_orientation').value || 'S';
+        inclinaison = parseInt(document.getElementById('id_inclinaison').value) || 30;
+        typeToiture = document.getElementById('type_toiture_autoconso').value || 'tuiles';
+        if (!surface || surface < 5) { alert('⚠️ Veuillez renseigner la surface de toiture disponible (minimum 5 m²)'); return; }
+    } else {
+        surface = parseFloat(document.getElementById('surface_vente').value) || 0;
+        orientation = document.getElementById('orientation_vente').value || 'S';
+        inclinaison = parseInt(document.getElementById('inclinaison_vente').value) || 30;
+        typeToiture = document.getElementById('type_toiture_vente').value || 'tuiles';
+        if (!surface || surface < 10) { alert('⚠️ Veuillez renseigner la surface disponible (minimum 10 m²)'); return; }
+    }
+
+    // Synchroniser dans les champs cachés du form
+    document.getElementById('id_surface_toiture_m2').value = surface;
+    document.getElementById('id_type_toiture').value = typeToiture;
+    document.getElementById('id_orientation').value = orientation;
+    document.getElementById('id_inclinaison').value = inclinaison;
+
+    // Appel AJAX (même endpoint que l'ancien)
+    fetch('{% url "frontend:calculate_optimal_power" %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: JSON.stringify({
+            consommation: conso,
+            objectif: objectif,
+            batterie: batterie,
+            latitude: latitude,
+            type_onduleur: document.getElementById('id_type_onduleur')?.value || 'string',
+            type_toiture: typeToiture,
+            surface_toiture_m2: surface,
+            type_panneau: document.getElementById('id_type_panneau')?.value || 'monocristallin_standard'
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        // Puissance
+        document.getElementById('puissance-recommandee').textContent = data.puissance_kw + ' kWc';
+        document.getElementById('nb-panneaux').textContent = Math.ceil(data.puissance_kw / 0.4);
+        document.getElementById('puissance_kw').value = data.puissance_kw;
+        // Mémoriser la puissance préconisée pour pouvoir y revenir
+        document.getElementById('puissance_kw').dataset.preconisee = data.puissance_kw;
+        // Forcer le recalcul du warning surface après mise à jour de la puissance
+        recalculerCout();
+        // Forcer le recalcul du warning surface après mise à jour de la puissance
+        recalculerCout();
+
+        // Métriques selon mode
+        const blocAuto = document.getElementById('metrics-autoconso');
+        const blocVente = document.getElementById('metrics-vente-totale');
+
+        if (data.mode === 'vente_totale') {
+            blocAuto.classList.add('hidden');
+            blocVente.classList.remove('hidden');
+            document.getElementById('vt-production').textContent = Math.round(data.production_kwh).toLocaleString('fr-FR');
+            document.getElementById('vt-tarif').textContent = data.tarif_rachat.toFixed(4);
+            document.getElementById('vt-revenu').textContent = Math.round(data.revenu_vente_annuel).toLocaleString('fr-FR') + ' €';
+            document.getElementById('vt-roi').textContent = data.roi_annees + ' ans';
+            document.getElementById('puissance_kw').min = 9;
+        } else {
+            blocAuto.classList.remove('hidden');
+            blocVente.classList.add('hidden');
+
+            // Affichage des métriques
+            document.getElementById('metric-production').textContent = Math.round(data.production_kwh).toLocaleString('fr-FR');
+            document.getElementById('metric-autoconso').textContent = '~' + data.taux_autoprod + '%';
+            document.getElementById('metric-economie').textContent = Math.round(data.economie_annuelle).toLocaleString('fr-FR') + ' €';
+            document.getElementById('metric-roi').textContent = data.roi_annees + ' ans';
+            document.getElementById('puissance_kw').min = 1;
+
+            // Stocker toutes les données de référence pour le recalcul analytique
+            // NB: on utilise `conso` (variable locale de calculerConfiguration) 
+            // qui contient déjà la valeur correcte lue avant l'appel AJAX
+            const inputPuissance = document.getElementById('puissance_kw');
+            inputPuissance.dataset.preconisee = data.puissance_kw;
+            inputPuissance.dataset.coutKwc    = data.cout_kwc;
+            inputPuissance.dataset.prodParKwc = Math.round(data.production_kwh / data.puissance_kw);
+            inputPuissance.dataset.consommation = conso;
+        }
+
+        // Coût
+        coutAutoValue = data.cout_installation;
+        primeAutoValue = data.prime_autoconso;
+        if (document.getElementById('cout-estime')) document.getElementById('cout-estime').textContent = data.cout_installation.toLocaleString('fr-FR');
+        if (document.getElementById('cout-net-estime')) document.getElementById('cout-net-estime').textContent = data.cout_net.toLocaleString('fr-FR');
+        if (document.getElementById('prime-estime')) document.getElementById('prime-estime').textContent = data.prime_autoconso.toLocaleString('fr-FR');
+        if (document.getElementById('cout-kwc-estime')) document.getElementById('cout-kwc-estime').textContent = data.cout_kwc.toLocaleString('fr-FR');
+        const primeRow = document.getElementById('prime-row');
+        if (primeRow) primeRow.style.display = data.prime_autoconso > 0 ? '' : 'none';
+        document.getElementById('cout_installation_final').value = data.cout_installation;
+
+        const tooltipEl = document.getElementById('cout-tooltip-text');
+        if (tooltipEl) {
+            tooltipEl.textContent = data.mode === 'vente_totale'
+                ? "Ce montant n'inclut pas le raccordement Enedis (compteur dédié, ~800-1400€) ni le Consuel (~195€)."
+                : "Ce montant n'inclut pas le raccordement Enedis (~50€) ni le Consuel (~195€). Prévoyez ~250€ supplémentaires.";
+        }
+
+        if (coutMode === 'manuel') updateCoutManuel();
+
+        // Batterie : visible seulement en autoconso
+        const battSection = document.getElementById('batterie-section');
+        if (battSection) battSection.classList.toggle('hidden', mode !== 'autoconso');
+
+        // Passer à l'étape 5
+        if (mode === 'autoconso') setStepCompleted('4a');
+        else setStepCompleted('3b');
+        currentStep = 5;
+        setStepActive(5);
+        showSection(5);
+    })
+    .catch(error => {
+        console.error('Erreur calcul:', error);
+        alert('Erreur lors du calcul. Veuillez réessayer.');
+    });
+}
+
+// ═══════════════════════════════════════════════════════════
+// PANNEAU
+// ═══════════════════════════════════════════════════════════
+function selectPanneau(value) {
+    document.getElementById('id_type_panneau').value = value;
+    document.querySelectorAll('.panneau-option').forEach(opt => {
+        opt.classList.remove('border-blue-500','bg-blue-50','border-purple-500','bg-purple-50','border-teal-500','bg-teal-so');
+        opt.classList.add('border-gray-200');
+    });
+    const colors = { monocristallin_standard: 'blue', topcon_hjt: 'purple', bifacial: 'teal' };
+    const c = colors[value] || 'blue';
+    const sel = document.querySelector(`.panneau-option[data-value="${value}"]`);
+    if (sel) { sel.classList.remove('border-gray-200'); sel.classList.add(`border-${c}-500`, `bg-${c}-50`); }
+    recalculerCout();
+
+    // Si on est déjà en étape 5, recalculer la puissance optimale via AJAX
+    const surface = parseFloat(document.getElementById('id_surface_toiture_m2').value) || 0;
+    if (surface > 0 && document.getElementById('puissance_kw').value) {
+        calculerConfiguration();
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// OMBRAGE
+// ═══════════════════════════════════════════════════════════
+function selectOmbrage(value) {
+    document.getElementById('id_facteur_ombrage').value = value;
+    const el3b = document.getElementById('id_facteur_ombrage_3b');
+    if (el3b) el3b.value = value;
+    const colors = { 0: 'green', 10: 'yellow', 20: 'orange', 30: 'red' };
+    document.querySelectorAll('.ombrage-option').forEach(opt => {
+        opt.classList.remove('border-green-500','bg-green-50','border-yellow-500','bg-yellow-50',
+                             'border-orange-500','bg-orange-50','border-red-500','bg-red-50');
+        opt.classList.add('border-gray-200');
+    });
+    const sel = document.querySelector(`.ombrage-option[data-value="${value}"]`);
+    if (sel) {
+        const c = colors[value] || 'green';
+        sel.classList.remove('border-gray-200');
+        sel.classList.add(`border-${c}-500`, `bg-${c}-50`);
+    }
+    updateOmbrageAdvice();
+}
+
+// Ombrage étape 4A (autoconso) - copie la valeur dans le champ caché principal
+function selectOmbrage4a(value) {
+    selectOmbrage(value);
+    // Synchroniser visuellement
+    const colors = { 0: 'green', 10: 'yellow', 20: 'orange', 30: 'red' };
+    document.querySelectorAll('.ombrage-option-4a').forEach(opt => {
+        opt.classList.remove('border-green-500','bg-green-50','border-yellow-500','bg-yellow-50',
+                             'border-orange-500','bg-orange-50','border-red-500','bg-red-50');
+        opt.classList.add('border-gray-200');
+    });
+    const sel = document.querySelector(`.ombrage-option-4a[data-value="${value}"]`);
+    if (sel) {
+        const c = colors[value] || 'green';
+        sel.classList.remove('border-gray-200');
+        sel.classList.add(`border-${c}-500`, `bg-${c}-50`);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ONDULEUR
+// ═══════════════════════════════════════════════════════════
+function selectOnduleur(value) {
+    document.getElementById('id_type_onduleur').value = value;
+    const colors = { string: 'blue', micro: 'purple', optimiseurs: 'teal' };
+    document.querySelectorAll('.onduleur-option').forEach(opt => {
+        opt.classList.remove('border-blue-500','bg-blue-50','border-purple-500','bg-purple-50','border-teal-500','bg-teal-50');
+        opt.classList.add('border-gray-200');
+    });
+    const sel = document.querySelector(`.onduleur-option[data-value="${value}"]`);
+    if (sel) {
+        const c = colors[value] || 'blue';
+        sel.classList.remove('border-gray-200');
+        sel.classList.add(`border-${c}-500`, `bg-${c}-50`);
+    }
+    updateOmbrageAdvice();
+    recalculerCout();
+}
+
+function updateOmbrageAdvice() {
+    const ombrage = parseInt(document.getElementById('id_facteur_ombrage').value) || 0;
+    const onduleur = document.getElementById('id_type_onduleur').value;
+    const infoDiv = document.getElementById('onduleur-ombrage-info');
+    if (infoDiv) infoDiv.classList.toggle('hidden', !(ombrage > 0 && onduleur === 'string'));
+}
+
+// ═══════════════════════════════════════════════════════════
+// PERSONNALISATION PUISSANCE
+// ═══════════════════════════════════════════════════════════
+function togglePersonnalisation() {
+    const input = document.getElementById('puissance_kw');
+    const icon = document.getElementById('lock-icon');
+    const flagPerso = document.getElementById('puissance_personnalisee_flag');
+    if (document.getElementById('toggle-perso').checked) {
+        input.readOnly = false;
+        input.classList.add('border-blue-500', 'bg-blue-50');
+        icon.textContent = '🔓';
+        if (flagPerso) flagPerso.value = '1';
+    } else {
+        if (flagPerso) flagPerso.value = '0';
+        input.readOnly = true;
+        input.classList.remove('border-blue-500', 'bg-blue-50');
+        icon.textContent = '🔒';
+        // Revenir à la puissance préconisée
+        const puissancePreconisee = parseFloat(input.dataset.preconisee || input.value);
+        input.value = puissancePreconisee;
+        const warning = document.getElementById('puissance-warning');
+        if (warning) warning.remove();
+        recalculerCout();
+        // Remettre les métriques de l'encart aux valeurs de référence AJAX
+        // (le listener `input` ne se déclenche pas quand on modifie value par JS)
+        input.dispatchEvent(new Event('input'));
+    }
+}
+
+// Recalcul analytique de l'encart bleu quand l'utilisateur change la puissance manuellement
+document.getElementById('puissance_kw').addEventListener('input', function() {
+    const puissance = parseFloat(this.value);
+    if (!puissance || puissance <= 0) return;
+
+    // Constantes tarifaires (identiques à calculer_puissance_optimale)
+    const PRIX_ACHAT      = 0.194;
+    const TARIF_SUP_INF_9 = 0.04;
+    const TARIF_SUP_SUP_9 = 0.0617;
+
+    // Données de référence stockées lors du calcul AJAX
+    const prodParKwc   = parseFloat(this.dataset.prodParKwc   || 1050);
+    const coutKwc      = parseFloat(this.dataset.coutKwc      || 1700);
+    const consommation = parseFloat(this.dataset.consommation || 5000);
+
+    // Prime autoconso selon seuil
+    let primeKwc;
+    if (puissance <= 9)       primeKwc = 80;
+    else if (puissance <= 36) primeKwc = 140;
+    else                      primeKwc = 70;
+
+    // Tarif surplus selon seuil
+    const tarifSurplus = puissance <= 9 ? TARIF_SUP_INF_9 : TARIF_SUP_SUP_9;
+
+    // Recalcul analytique
+    const production = puissance * prodParKwc;
+    const autoconso  = Math.min(production * 0.45, consommation);
+    const surplus    = production - autoconso;
+    const economie   = autoconso * PRIX_ACHAT + surplus * tarifSurplus;
+    const coutTotal  = coutKwc * puissance;
+    const prime      = primeKwc * puissance;
+    const coutNet    = coutTotal - prime;
+    const roi        = economie > 0 ? coutNet / economie : 99;
+    const couverture = consommation > 0 ? Math.min(Math.round(autoconso / consommation * 100), 100) : 0;
+
+    // Mise à jour de l'encart
+    document.getElementById('metric-production').textContent = Math.round(production).toLocaleString('fr-FR');
+    document.getElementById('metric-autoconso').textContent  = '~' + couverture + '%';
+    document.getElementById('metric-economie').textContent   = Math.round(economie).toLocaleString('fr-FR') + ' €';
+    document.getElementById('metric-roi').textContent        = roi.toFixed(1) + ' ans';
+});
+// ═══════════════════════════════════════════════════════════
+// RECALCUL COÛT EN TEMPS RÉEL (panneau + onduleur + puissance)
+// ═══════════════════════════════════════════════════════════
+function getSurfaceParKwc() {
+    const typePanneau = document.getElementById('id_type_panneau').value;
+    const surfaceParKwc = {
+        monocristallin_standard: 6.5,
+        topcon_hjt: 5.5,
+        bifacial: 6.0
+    };
+    return surfaceParKwc[typePanneau] || 6.5;
+}
+
+function getMaxKwc(surface) {
+    const ratio = getSurfaceParKwc();
+    return Math.floor((surface / ratio) * 2) / 2;
+}
+
+function recalculerCout() {
+    const puissance = parseFloat(document.getElementById('puissance_kw').value) || 0;
+    if (puissance <= 0) return;
+
+    // Surcoûts selon type panneau
+    const typePanneau = document.getElementById('id_type_panneau').value;
+    const surcoutPanneau = { monocristallin_standard: 0, topcon_hjt: 150, bifacial: 80 };
+
+    // Surcoûts selon onduleur
+    const typeOnduleur = document.getElementById('id_type_onduleur').value;
+    const surcoutOnduleur = { string: 0, optimiseurs: 100, micro: 200 };
+
+    // Coût de base par kWc (grille dégressive)
+    let coutBase;
+    if (puissance <= 3) coutBase = 2200;
+    else if (puissance <= 6) coutBase = 1900;
+    else if (puissance <= 9) coutBase = 1700;
+    else if (puissance <= 12) coutBase = 1500;
+    else if (puissance <= 36) coutBase = 1400;
+    else coutBase = 1300;
+
+    const coutKwc = coutBase + (surcoutOnduleur[typeOnduleur] || 0) + (surcoutPanneau[typePanneau] || 0);
+    const coutBrut = Math.round(coutKwc * puissance);
+
+    // Tarif rachat selon puissance
+    const objectif2 = document.getElementById('objectif_choisi').value;
+    let tarifRachat;
+    if (objectif2 === 'revente') {
+        tarifRachat = puissance <= 36 ? '0,0911' : '0,0792';
+    } else {
+        tarifRachat = puissance <= 9 ? '0,04' : '0,0617';
+    }
+    const tarifEl = document.getElementById('tarif-rachat-display');
+    if (tarifEl) tarifEl.textContent = tarifRachat;
+    const vtTarifEl = document.getElementById('vt-tarif');
+    if (vtTarifEl) vtTarifEl.textContent = tarifRachat;
+
+    // Prime autoconso
+    let prime = 0;
+    const objectif = document.getElementById('objectif_choisi').value;
+    if (objectif !== 'revente') {
+        if (puissance <= 9) prime = Math.round(80 * puissance);
+        else if (puissance <= 36) prime = Math.round(140 * puissance);
+        else prime = Math.round(70 * puissance);
+    }
+
+    const coutNet = coutBrut - prime;
+
+    // Mise à jour affichage
+    const el = (id) => document.getElementById(id);
+    if (el('cout-kwc-estime')) el('cout-kwc-estime').textContent = coutKwc.toLocaleString('fr-FR');
+    if (el('cout-estime')) el('cout-estime').textContent = coutBrut.toLocaleString('fr-FR');
+    if (el('cout-net-estime')) el('cout-net-estime').textContent = coutNet.toLocaleString('fr-FR');
+    if (el('prime-estime')) el('prime-estime').textContent = prime.toLocaleString('fr-FR');
+    if (el('prime-row')) el('prime-row').style.display = prime > 0 ? '' : 'none';
+    if (el('cout_installation_final')) el('cout_installation_final').value = coutBrut;
+
+    coutAutoValue = coutBrut;
+    primeAutoValue = prime;
+    if (coutMode === 'manuel') updateCoutManuel();
+
+    // Vérification surface
+    const surface = parseFloat(document.getElementById('id_surface_toiture_m2').value) || 0;
+    if (surface > 0) {
+        const maxKwc = getMaxKwc(surface);
+        const maxKwcAffiche = (Math.floor((surface / getSurfaceParKwc()) * 10) / 10).toLocaleString('fr-FR');
+        const warningEl = document.getElementById('puissance-warning');
+
+        if (puissance > maxKwc + 1.5) {
+            // Zone rouge ”” dépassement significatif
+            const msg = `⚠️ La surface semble insuffisante ”” maximum réalisable estimé : ${maxKwcAffiche} kWc pour ${surface} m² (${getSurfaceParKwc()} m²/kWc avec ce type de panneau)`;
+            if (!warningEl) {
+                const w = document.createElement('p');
+                w.id = 'puissance-warning';
+                w.className = 'text-red-600 text-sm mt-1 font-semibold';
+                w.textContent = msg;
+                document.getElementById('puissance_kw').parentNode.appendChild(w);
+            } else {
+                warningEl.className = 'text-red-600 text-sm mt-1 font-semibold';
+                warningEl.textContent = msg;
+            }
+        } else if (puissance > maxKwc - 1.5) {
+            // Zone orange ”” surface juste suffisante, légère mise en garde
+            const msg = `💡 Surface légèrement juste pour ${puissance} kWc ”” vérifiez avec votre installateur que les ${surface} m² disponibles permettent bien cette puissance (ratio ${getSurfaceParKwc()} m²/kWc avec ce type de panneau).`;
+            if (!warningEl) {
+                const w = document.createElement('p');
+                w.id = 'puissance-warning';
+                w.className = 'text-orange-500 text-sm mt-1 font-semibold';
+                w.textContent = msg;
+                document.getElementById('puissance_kw').parentNode.appendChild(w);
+            } else {
+                warningEl.className = 'text-orange-500 text-sm mt-1 font-semibold';
+                warningEl.textContent = msg;
+            }
+        } else {
+            // Zone verte ”” pas de message
+            if (warningEl) warningEl.remove();
+        }
+    }
+
+    // Nb panneaux
+    const nb = Math.ceil(puissance / 0.4);
+    if (el('nb-panneaux')) el('nb-panneaux').textContent = nb;
+    if (el('puissance-recommandee')) el('puissance-recommandee').textContent = puissance.toFixed(1) + ' kWc';
+}
+
+// ═══════════════════════════════════════════════════════════
+// COÛT
+// ═══════════════════════════════════════════════════════════
+function setCoutMode(mode) {
+    coutMode = mode;
+    const btnAuto = document.getElementById('btn-cout-auto');
+    const btnManuel = document.getElementById('btn-cout-manuel');
+    const modeAuto = document.getElementById('cout-mode-auto');
+    const modeManuel = document.getElementById('cout-mode-manuel');
+    if (mode === 'auto') {
+        btnAuto.className = 'flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all bg-blue-600 text-white shadow';
+        btnManuel.className = 'flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all bg-white text-gray-600 border border-gray-300 hover:bg-gray-100';
+        modeAuto.classList.remove('hidden');
+        modeManuel.classList.add('hidden');
+        document.getElementById('cout_installation_final').value = coutAutoValue;
+    } else {
+        btnManuel.className = 'flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all bg-blue-600 text-white shadow';
+        btnAuto.className = 'flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all bg-white text-gray-600 border border-gray-300 hover:bg-gray-100';
+        modeManuel.classList.remove('hidden');
+        modeAuto.classList.add('hidden');
+        const input = document.getElementById('cout-manuel-input');
+        if (!input.value && coutAutoValue > 0) { input.value = coutAutoValue; updateCoutManuel(); }
+    }
+}
+
+function updateCoutManuel() {
+    const input = document.getElementById('cout-manuel-input');
+    const coutBrut = parseFloat(input.value) || 0;
+    if (coutBrut <= 0) {
+        document.getElementById('cout-manuel-detail').classList.add('hidden');
+        document.getElementById('cout_installation_final').value = '';
+        return;
+    }
+    document.getElementById('cout-manuel-detail').classList.remove('hidden');
+    const prime = primeAutoValue;
+    const coutNet = coutBrut - prime;
+    document.getElementById('cout-net-manuel').textContent = Math.round(coutNet).toLocaleString('fr-FR');
+    const primeRowManuel = document.getElementById('prime-row-manuel');
+    if (prime > 0) {
+        primeRowManuel.style.display = '';
+        document.getElementById('prime-estime-manuel').textContent = Math.round(prime).toLocaleString('fr-FR');
+    } else {
+        primeRowManuel.style.display = 'none';
+    }
+    document.getElementById('cout_installation_final').value = coutBrut;
+}
+
+// 
+// CARTE LEAFLET – SATELLITE + DESSIN TOITURE
+// 
+
+// Couches de tuiles
+const layerSatellite = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    { attribution: 'Tiles © Esri', maxZoom: 19 }
+);
+const layerPlan = L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution: '© OpenStreetMap contributors', maxZoom: 19 }
+);
+
+let currentLayer = 'satellite';
+
+map = L.map('map', { layers: [layerSatellite] }).setView([46.603354, 1.888334], 6);
+
+function setMapLayer(type) {
+    if (type === 'satellite') {
+        map.removeLayer(layerPlan);
+        map.addLayer(layerSatellite);
+        currentLayer = 'satellite';
+        document.getElementById('btn-satellite').className = 'draw-btn draw-btn-primary text-xs';
+        document.getElementById('btn-plan').className = 'draw-btn draw-btn-gray text-xs';
+    } else {
+        map.removeLayer(layerSatellite);
+        map.addLayer(layerPlan);
+        currentLayer = 'plan';
+        document.getElementById('btn-plan').className = 'draw-btn draw-btn-primary text-xs';
+        document.getElementById('btn-satellite').className = 'draw-btn draw-btn-gray text-xs';
+    }
+}
+
+// Click carte pour placer le marker de localisation (désactivé pendant le dessin)
+map.on('click', function(e) {
+    if (drawingActive) return; // ne pas déplacer le marker pendant le dessin
+    const lat = e.latlng.lat.toFixed(6);
+    const lon = e.latlng.lng.toFixed(6);
+    updateLocation(lat, lon);
+    if (marker) marker.setLatLng(e.latlng);
+    else marker = L.marker(e.latlng, { icon: customIcon }).addTo(map);
+});
+
+function updateLocation(lat, lon, address = '') {
+    document.getElementById('latitude-input').value = lat;
+    document.getElementById('longitude-input').value = lon;
+    document.getElementById('display-lat').textContent = parseFloat(lat).toFixed(4) + '°';
+    document.getElementById('display-lon').textContent = parseFloat(lon).toFixed(4) + '°';
+    if (address) document.getElementById('adresse-input').value = address;
+}
+
+// ─── Dessin de toiture ───
+let drawingActive = false;
+let drawControl = null;
+let roofLayer = null;
+const drawnItems = new L.FeatureGroup();
+map.addLayer(drawnItems);
+
+// Restaurer surface dessinée depuis sessionStorage (si navigation retour)
+(function restoreRoofFromSession() {
+    const surf = sessionStorage.getItem('roof_surface');
+    const orVal = sessionStorage.getItem('roof_orientation');
+    const orLabel = sessionStorage.getItem('roof_orientation_label');
+    if (!surf) return;
+
+    // Remplir les champs
+    const surfAuto = document.getElementById('surface_autoconso');
+    const surfVente = document.getElementById('surface_vente');
+    if (surfAuto) surfAuto.value = surf;
+    if (surfVente) surfVente.value = surf;
+    document.getElementById('roof-surface-hidden').value = surf;
+
+    // Afficher résultat dans l'UI étape 1
+    document.getElementById('roof-surface-display').textContent = parseInt(surf).toLocaleString('fr-FR');
+    if (orLabel) document.getElementById('roof-orientation-display').textContent = orLabel;
+    document.getElementById('roof-result').classList.add('visible');
+    document.getElementById('btn-draw-roof').style.display = 'none';
+    if (document.getElementById('roof-orientation-hidden'))
+        document.getElementById('roof-orientation-hidden').value = orVal || '';
+
+    // Badges
+    const noticeAuto = document.getElementById('roof-prefill-notice-auto');
+    const noticeVente = document.getElementById('roof-prefill-notice-vente');
+    if (noticeAuto) noticeAuto.classList.remove('hidden');
+    if (noticeVente) noticeVente.classList.remove('hidden');
+})();
+
+function startDrawing() {
+    // Passer en satellite pour mieux voir
+    if (currentLayer !== 'satellite') setMapLayer('satellite');
+    // Zoom si on a une localisation
+    const lat = document.getElementById('latitude-input').value;
+    const lon = document.getElementById('longitude-input').value;
+    if (lat && lon) map.setView([parseFloat(lat), parseFloat(lon)], 19);
+
+    drawingActive = true;
+    document.getElementById('drawing-panel').classList.add('visible');
+    document.getElementById('btn-draw-roof').style.display = 'none';
+    document.getElementById('roof-result').classList.remove('visible');
+
+    drawControl = new L.Draw.Polygon(map, {
+        shapeOptions: {
+            color: '#667eea',
+            fillColor: '#667eea',
+            fillOpacity: 0.3,
+            weight: 3
+        },
+        showArea: true,
+        metric: true
+    });
+    drawControl.enable();
+
+    // Afficher le bouton Valider dès qu'un sommet est posé
+    map.once('click', function() {
+        setTimeout(function() {
+            const btnV = document.getElementById('btn-validate-drawing');
+            if (btnV && drawingActive) btnV.style.display = '';
+        }, 300);
+    });
+}
+
+function validateDrawing() {
+    // Simule un double-clic pour fermer le polygone en cours
+    if (drawControl && drawingActive) {
+        drawControl._finishShape();
+    }
+}
+
+function cancelDrawing() {
+    if (drawControl) { drawControl.disable(); drawControl = null; }
+    drawingActive = false;
+    document.getElementById('drawing-panel').classList.remove('visible');
+    document.getElementById('btn-draw-roof').style.display = '';
+    const btnV = document.getElementById('btn-validate-drawing');
+    if (btnV) btnV.style.display = 'none';
+}
+
+function clearRoofDrawing() {
+    drawnItems.clearLayers();
+    roofLayer = null;
+    document.getElementById('roof-result').classList.remove('visible');
+    document.getElementById('btn-draw-roof').style.display = '';
+    document.getElementById('roof-surface-hidden').value = '';
+    document.getElementById('roof-orientation-hidden').value = '';
+    // Réinitialiser les champs des étapes suivantes
+    const surfAuto = document.getElementById('surface_autoconso');
+    const surfVente = document.getElementById('surface_vente');
+    if (surfAuto) surfAuto.value = '';
+    if (surfVente) surfVente.value = '';
+    const noticeAuto = document.getElementById('roof-prefill-notice-auto');
+    const noticeVente = document.getElementById('roof-prefill-notice-vente');
+    if (noticeAuto) noticeAuto.classList.add('hidden');
+    if (noticeVente) noticeVente.classList.add('hidden');
+    sessionStorage.removeItem('roof_surface');
+    sessionStorage.removeItem('roof_orientation');
+    sessionStorage.removeItem('roof_orientation_label');
+}
+
+// Calcul surface géodésique (m²) depuis un polygone Leaflet
+function calcPolygonArea(latlngs) {
+    const R = 6371000; // rayon Terre en mètres
+    const pts = latlngs.map(ll => ({
+        lat: ll.lat * Math.PI / 180,
+        lng: ll.lng * Math.PI / 180
+    }));
+    let area = 0;
+    const n = pts.length;
+    for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        area += (pts[j].lng - pts[i].lng) * (2 + Math.sin(pts[i].lat) + Math.sin(pts[j].lat));
+    }
+    return Math.abs(area * R * R / 2);
+}
+
+// Estimation orientation du pan de toit depuis le polygone dessiné
+function estimateOrientation(latlngs) {
+    // Approche : normale pondérée par longueur d'arête
+    // Une toiture orientée Sud a son faîtage Est-Ouest → les arêtes principales
+    // pointent E-O, leur normale pointe N ou S. On choisit le côté Sud.
+    //
+    // Pour chaque arête du polygone :
+    //   - vecteur arête (dx, dy) en coordonnées locales (lng corrigé par cos(lat))
+    //   - normale = (-dy, dx) et (dy, -dx)
+    //   - pondérer par longueur de l'arête
+    // Sommer toutes les normales pondérées → vecteur résultant → azimut dominant
+
+    const n = latlngs.length;
+    const latRef = latlngs[0].lat * Math.PI / 180;
+    const cosLat = Math.cos(latRef); // correction distortion longitude
+
+    let nx = 0, ny = 0; // composantes de la normale cumulée
+
+    for (let i = 0; i < n; i++) {
+        const a = latlngs[i];
+        const b = latlngs[(i + 1) % n];
+        // Vecteur arête en mètres approx (x=Est, y=Nord)
+        const dx = (b.lng - a.lng) * cosLat;
+        const dy = (b.lat - a.lat);
+        const len = Math.sqrt(dx * dx + dy * dy);
+        if (len < 1e-10) continue;
+        // Normale unitaire vers la droite du vecteur arête (côté extérieur pour polygone CCW)
+        // = (dy/len, -dx/len), soit x=Nord dy/len, y=Est -dx/len
+        // On accumule les deux normales possibles, on choisira ensuite côté sud
+        nx += dy; // composante Nord de la normale
+        ny -= dx; // composante Est de la normale
+    }
+
+    // Azimut de la normale cumulée (0=N, 90=E, 180=S, 270=W)
+    let azimuth = Math.atan2(ny, nx) * 180 / Math.PI;
+    azimuth = (90 - azimuth + 360) % 360; // convertir math→géo
+
+    // Si la normale pointe vers le Nord (azimut < 90 ou > 270), inverser → côté Sud
+    // On veut toujours le côté le plus ensoleillé (le plus proche de 180°)
+    if (Math.abs(azimuth - 180) > 90) azimuth = (azimuth + 180) % 360;
+
+    // Convertir en label
+    if (azimuth >= 337.5 || azimuth < 22.5)  return { label: 'Nord',       value: 'N'  };
+    if (azimuth < 67.5)                       return { label: 'Nord-Est',   value: 'NE' };
+    if (azimuth < 112.5)                      return { label: 'Est',        value: 'E'  };
+    if (azimuth < 157.5)                      return { label: 'Sud-Est',    value: 'SE' };
+    if (azimuth < 202.5)                      return { label: 'Sud',        value: 'S'  };
+    if (azimuth < 247.5)                      return { label: 'Sud-Ouest',  value: 'SW' };
+    if (azimuth < 292.5)                      return { label: 'Ouest',      value: 'W'  };
+    return                                           { label: 'Nord-Ouest', value: 'NW' };
+}
+
+// Écouter la fin du dessin
+map.on(L.Draw.Event.CREATED, function(e) {
+    drawingActive = false;
+    if (drawControl) { drawControl.disable(); drawControl = null; }
+    document.getElementById('drawing-panel').classList.remove('visible');
+    const btnV = document.getElementById('btn-validate-drawing');
+    if (btnV) btnV.style.display = 'none';
+
+    drawnItems.clearLayers();
+    roofLayer = e.layer;
+    drawnItems.addLayer(roofLayer);
+
+    const latlngs = roofLayer.getLatLngs()[0];
+    const surface = Math.round(calcPolygonArea(latlngs));
+    const orientation = estimateOrientation(latlngs);
+
+    // Afficher résultat
+    document.getElementById('roof-surface-display').textContent = surface.toLocaleString('fr-FR');
+    document.getElementById('roof-orientation-display').textContent = orientation.label;
+    document.getElementById('roof-result').classList.add('visible');
+    document.getElementById('btn-draw-roof').style.display = 'none';
+
+    // Stocker dans champs cachés
+    document.getElementById('roof-surface-hidden').value = surface;
+    document.getElementById('roof-orientation-hidden').value = orientation.value;
+
+    // Pré-remplir les champs des étapes suivantes
+    const surfAuto = document.getElementById('surface_autoconso');
+    const surfVente = document.getElementById('surface_vente');
+    if (surfAuto) surfAuto.value = surface;
+    if (surfVente) surfVente.value = surface;
+
+    // Persister dans sessionStorage pour résister à la navigation
+    sessionStorage.setItem('roof_surface', surface);
+    sessionStorage.setItem('roof_orientation', orientation.value);
+    sessionStorage.setItem('roof_orientation_label', orientation.label);
+
+    // Afficher badge "pré-rempli depuis dessin"
+    const noticeAuto = document.getElementById('roof-prefill-notice-auto');
+    const noticeVente = document.getElementById('roof-prefill-notice-vente');
+    if (noticeAuto) noticeAuto.classList.remove('hidden');
+    if (noticeVente) noticeVente.classList.remove('hidden');
+
+    // Pré-remplir l'orientation (si valeur reconnue dans les selects)
+    const orVal = orientation.value;
+    const selAuto = document.getElementById('orientation_autoconso');
+    const selVente = document.getElementById('orientation_vente');
+    // Les selects ont : S, SE, SW, E, EW, W, N – on mappe NE→E, NW→N
+    const orientMap = { 'S':'S','SE':'SE','SW':'SW','E':'E','W':'W','N':'N','NE':'NE','NW':'NW' };
+    const mappedOr = orientMap[orVal] || 'S';
+    if (selAuto) { selAuto.value = mappedOr; document.getElementById('id_orientation').value = mappedOr; }
+    if (selVente) selVente.value = mappedOr;
+});
+
+map.on(L.Draw.Event.DRAWSTOP, function() {
+    // Si l'utilisateur annule via Echap
+    if (drawingActive) {
+        drawingActive = false;
+        document.getElementById('drawing-panel').classList.remove('visible');
+        document.getElementById('btn-draw-roof').style.display = '';
+    }
+});
+
+// Géolocalisation automatique (désactivée en mode restauration)
+{% if not restore_mode %}
+if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(position) {
+        const lat = position.coords.latitude.toFixed(6);
+        const lon = position.coords.longitude.toFixed(6);
+        map.setView([lat, lon], 18);
+        marker = L.marker([lat, lon], { icon: customIcon }).addTo(map);
+        updateLocation(lat, lon);
+    });
+}
+{% endif %}
+
+
+// Pré-remplissage si données de consommation
+{% if not restore_mode %}
+if (consoData) {
+    updateLocation(consoData.latitude, consoData.longitude, consoData.adresse || '');
+    map.setView([consoData.latitude, consoData.longitude], 13);
+    marker = L.marker([consoData.latitude, consoData.longitude], { icon: customIcon }).addTo(map);
+    const radioAnalysee = document.querySelector('input[value="analysee"]');
+    const consoDetails = document.getElementById('conso-analysee-details');
+    const consoValue = document.getElementById('conso-value');
+    const consoFinale = document.getElementById('consommation_finale');
+    if (radioAnalysee) radioAnalysee.checked = true;
+    if (consoDetails) consoDetails.classList.remove('hidden');
+    if (consoValue) consoValue.textContent = consoData.consommation_annuelle.toFixed(0);
+    if (consoFinale) consoFinale.value = consoData.consommation_annuelle;
+    // Navigation automatique vers étape 2
+    setTimeout(() => {
+        setStepCompleted(1);
+        currentStep = 2;
+        setStepActive(2);
+        showSection(2);
+    }, 1000);
+}
+{% endif %}
+
+// ═══════════════════════════════════════════════════════════
+// AUTOCOMPLETE ADRESSE
+// ═══════════════════════════════════════════════════════════
+let searchTimeout;
+const addressInput = document.getElementById('adresse-input');
+const suggestionsDiv = document.getElementById('address-suggestions');
+
+if (addressInput) {
+    addressInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        const query = this.value.trim();
+        if (query.length < 3) { suggestionsDiv.classList.remove('show'); return; }
+        searchTimeout = setTimeout(() => searchAddress(query), 300);
+    });
+    document.addEventListener('click', function(e) {
+        if (!addressInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+            suggestionsDiv.classList.remove('show');
+        }
+    });
+}
+
+function searchAddress(query) {
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=fr&accept-language=fr`)
+    .then(r => r.json())
+    .then(results => {
+        suggestionsDiv.innerHTML = '';
+        if (!results.length) { suggestionsDiv.classList.remove('show'); return; }
+        results.forEach(result => {
+            const div = document.createElement('div');
+            div.className = 'suggestion-item';
+            div.textContent = result.display_name;
+            div.addEventListener('click', () => {
+                addressInput.value = result.display_name;
+                const lat = parseFloat(result.lat).toFixed(6);
+                const lon = parseFloat(result.lon).toFixed(6);
+                updateLocation(lat, lon, result.display_name);
+                if (marker) marker.setLatLng([lat, lon]);
+                else marker = L.marker([lat, lon], { icon: customIcon }).addTo(map);
+                map.setView([lat, lon], 13);
+                suggestionsDiv.classList.remove('show');
+            });
+            suggestionsDiv.appendChild(div);
+        });
+        suggestionsDiv.classList.add('show');
+    })
+    .catch(() => {});
+}
+
+// ═══════════════════════════════════════════════════════════
+// RESTAURATION (retour depuis formulaire de consommation)
+// ═══════════════════════════════════════════════════════════
+{% if restore_mode %}
+window.addEventListener('load', function() {
+    hasConsumptionProfile = true;
+
+    setTimeout(function() {
+        // Forcer les valeurs critiques du formulaire
+        document.getElementById('mode_principal').value = 'autoconso';
+        // objectif_choisi sera restauré depuis l'URL ci-dessous
+        // Réinitialiser la puissance (ne doit pas être pré-remplie)
+        document.getElementById('puissance_kw').value = '';
+        document.getElementById('puissance-recommandee').textContent = '--.-- kWc';
+
+        // Restaurer localisation depuis sessionStorage
+        const savedData = sessionStorage.getItem('simulation_partial');
+        if (savedData) {
+            try {
+                const data = JSON.parse(savedData);
+                if (data.adresse) document.getElementById('adresse-input').value = data.adresse;
+                if (data.latitude) {
+                    document.getElementById('latitude-input').value = data.latitude;
+                    document.getElementById('display-lat').textContent = data.latitude + '°';
+                }
+                if (data.longitude) {
+                    document.getElementById('longitude-input').value = data.longitude;
+                    document.getElementById('display-lon').textContent = data.longitude + '°';
+                }
+                if (data.latitude && data.longitude && map) {
+                    map.setView([data.latitude, data.longitude], 13);
+                    marker = marker || L.marker([data.latitude, data.longitude], { icon: customIcon }).addTo(map);
+                    marker.setLatLng([data.latitude, data.longitude]);
+                }
+                sessionStorage.removeItem('simulation_partial');
+            } catch(e) {}
+        }
+
+        // Injecter consommation
+        {% if consommation_from_profil %}
+        document.getElementById('consommation_finale').value = parseInt("{{ consommation_from_profil|stringformat:'d' }}");
+        {% endif %}
+
+        // Configurer le mode sans déclencher updateStepIndicator
+        modePrincipal = 'autoconso';
+        document.getElementById('mode_principal').value = 'autoconso';
+        document.getElementById('mode-autoconso').className = 'mode-card selected-autoconso';
+        document.getElementById('mode-vente').className = 'mode-card';
+        // Restaurer l'objectif depuis l'URL (paramètre ?objectif=)
+        const urlParams = new URLSearchParams(window.location.search);
+        const objectifURL = urlParams.get('objectif');
+        const objectifsValides = ['rentabilite', 'autonomie', 'equilibre', 'revente'];
+        let objectifRestaure = objectifsValides.includes(objectifURL) ? objectifURL : 'rentabilite';
+
+        document.getElementById('objectif_choisi').value = objectifRestaure;
+        const elObj = document.getElementById('obj-' + objectifRestaure);
+        if (elObj) elObj.classList.add('selected');
+
+        // Marquer les étapes complétées
+        setStepCompleted(1);
+        setStepCompleted(2);
+        setStepCompleted('3a');
+
+        // Aller directement en étape 4A
+        currentStep = '4a';
+        console.log('modePrincipal:', modePrincipal);
+        console.log('section-4a existe:', document.getElementById('section-4a'));
+        console.log('section-4a classes:', document.getElementById('section-4a')?.className);
+        console.log('step-4a existe:', document.getElementById('step-4a'));
+        document.querySelectorAll('.form-section').forEach(s => s.classList.add('hidden'));
+        document.getElementById('section-4a').classList.remove('hidden');
+        setStepActive('4a');
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 800);
+});
+{% endif %}
+
+// ═══════════════════════════════════════════════════════════
+// LIEN FORMULAIRE DÉTAILLÉ
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', function() {
+    const detailedLink = document.getElementById('detailed-consumption-link');
+    if (detailedLink) {
+        detailedLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            const formData = {
+                adresse: document.getElementById('adresse-input').value,
+                latitude: document.getElementById('latitude-input').value,
+                longitude: document.getElementById('longitude-input').value,
+                consommation_annuelle: document.getElementById('consommation_annuelle')?.value || '',
+                objectif: document.getElementById('objectif_choisi').value || '',
+                current_step: 2
+            };
+            sessionStorage.setItem('simulation_partial', JSON.stringify(formData));
+            const objectifActuel = document.getElementById('objectif_choisi').value || 'rentabilite';
+            window.location.href = '{% url "frontend:configure_consumption" %}?return=simulation&objectif=' + objectifActuel;
+        });
+    }
+
+    // Initialiser sélections par défaut
+    selectOnduleur('string');
+    selectOmbrage(0);
+    selectPanneau('monocristallin_standard');
+    selectTypeInstallation('toiture');
+
+    const puissanceInput = document.getElementById('puissance_kw');
+    if (puissanceInput) {
+        puissanceInput.addEventListener('input', recalculerCout);
+    }
+});
+
+// ═══════════════════════════════════════════════════════════
+// SOUMISSION FORMULAIRE
+// ═══════════════════════════════════════════════════════════
+document.getElementById('simulation-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const puissance = parseFloat(document.getElementById('puissance_kw').value) || 0;
+    if (!puissance) { alert('⚠️ Puissance manquante'); return; }
+
+    const surface = parseFloat(document.getElementById('id_surface_toiture_m2').value) || 0;
+    const maxKwc = surface > 0 ? getMaxKwc(surface) : 999;
+
+    const lancerSimulation = () => {
+        // DEBUG TEMPORAIRE
+        console.log('consommation_finale:', document.getElementById('consommation_finale').value);
+        console.log('puissance_kw:', document.getElementById('puissance_kw').value);
+        console.log('latitude:', document.getElementById('latitude-input').value);
+        console.log('longitude:', document.getElementById('longitude-input').value);
+        console.log('objectif:', document.getElementById('objectif_choisi').value);
+        console.log('surface:', document.getElementById('id_surface_toiture_m2').value);
+        //
+        document.getElementById('submit-button').disabled = true;
+        document.getElementById('submit-button').innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Lancement...';
+        // Ajouter flag si dépassement surface
+        if (surface > 0 && puissance > maxKwc) {
+            const flag = document.createElement('input');
+            flag.type = 'hidden';
+            flag.name = 'puissance_hors_surface';
+            flag.value = '1';
+            this.appendChild(flag);
+        }
+        // Retirer le required de tous les champs cachés ou vides
+        // pour éviter "invalid form control with name='' is not focusable"
+        this.querySelectorAll('input[required]').forEach(el => {
+            if (el.type === 'hidden' || el.offsetParent === null) {
+                el.removeAttribute('required');
+            }
+        });
+        this.submit();
+    };
+
+    if (surface > 0 && puissance > maxKwc) {
+        // Afficher modale de confirmation
+        const confirmed = confirm(
+            `⚠️ Attention : la puissance saisie (${puissance} kWc) dépasse ce que permet votre surface disponible (${surface} m² → max ${maxKwc} kWc).\n\n` +
+            `Voulez-vous quand même lancer la simulation avec ${puissance} kWc ?\n\n` +
+            `• OUI → simulation lancée avec ${puissance} kWc (un avertissement apparaîtra dans les résultats)\n` +
+            `• NON → retour au formulaire pour corriger`
+        );
+        if (confirmed) lancerSimulation();
+        // Si non → ne rien faire, rester sur la page
+    } else {
+        lancerSimulation();
+    }
+});
+</script>
+{% endblock %}

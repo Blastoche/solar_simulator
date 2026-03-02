@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Résultat - Calculateur de Consommation{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 py-12">
+    <div class="max-w-4xl mx-auto px-4">
+        
+        <!-- En-tête -->
+        <div class="text-center mb-8">
+            <div class="inline-block bg-green-100 text-green-800 px-4 py-2 rounded-full text-sm font-semibold mb-4">
+                ✓ Calcul terminé
+            </div>
+            <h1 class="text-4xl font-bold text-gray-900 mb-4">
+                Votre Consommation Électrique
+            </h1>
+        </div>
+        
+        <!-- Résultat principal -->
+        <div class="bg-white rounded-2xl shadow-2xl p-8 mb-8 text-center">
+            <div class="mb-4">
+                <p class="text-gray-600 text-lg mb-2">Consommation annuelle estimée</p>
+                <div class="text-6xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-2">
+                    {{ consommation.consommation_annuelle_totale|floatformat:0 }}
+                </div>
+                <p class="text-2xl text-gray-700 font-semibold">kWh/an</p>
+            </div>
+            
+            <!-- Comparaison à la moyenne -->
+            <div class="mt-8 p-6 bg-gray-50 rounded-xl">
+                <div class="flex items-center justify-center mb-4">
+                    <span class="text-4xl mr-3">{{ comparaison.emoji }}</span>
+                    <div class="text-left">
+                        <p class="text-sm text-gray-600">Votre consommation est</p>
+                        <p class="text-xl font-bold text-gray-900">{{ comparaison.niveau }}</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="bg-white p-4 rounded-lg">
+                        <p class="text-sm text-gray-600">Moyenne attendue</p>
+                        <p class="text-2xl font-bold text-gray-900">
+                            {{ consommation.consommation_moyenne_attendue|floatformat:0 }}
+                            <span class="text-sm text-gray-600">kWh/an</span>
+                        </p>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg">
+                        <p class="text-sm text-gray-600">Écart</p>
+                        <p class="text-2xl font-bold {% if consommation.ecart_pourcentage > 0 %}text-orange-600{% else %}text-green-600{% endif %}">
+                            {% if consommation.ecart_pourcentage > 0 %}+{% endif %}{{ consommation.ecart_pourcentage|floatformat:1 }}%
+                        </p>
+                    </div>
+                </div>
+                
+                <p class="text-gray-700 text-sm">
+                    💡 {{ comparaison.conseil }}
+                </p>
+            </div>
+        </div>
+        
+        <!-- Votre profil -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">📋 Votre profil</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="text-center p-4 bg-gray-50 rounded-lg">
+                    <p class="text-sm text-gray-600 mb-1">Surface</p>
+                    <p class="text-lg font-bold text-gray-900">{{ consommation.surface_habitable|floatformat:0 }} m²</p>
+                </div>
+                <div class="text-center p-4 bg-gray-50 rounded-lg">
+                    <p class="text-sm text-gray-600 mb-1">Personnes</p>
+                    <p class="text-lg font-bold text-gray-900">{{ consommation.nb_personnes }}</p>
+                </div>
+                <div class="text-center p-4 bg-gray-50 rounded-lg">
+                    <p class="text-sm text-gray-600 mb-1">DPE</p>
+                    <p class="text-lg font-bold text-gray-900">{{ consommation.dpe }}</p>
+                </div>
+                <div class="text-center p-4 bg-gray-50 rounded-lg">
+                    <p class="text-sm text-gray-600 mb-1">Zone</p>
+                    <p class="text-lg font-bold text-gray-900">{{ consommation.zone_climatique }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- NOUVEAU : Coût Annuel Estimé -->
+        {% if financier %}
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">💰 Coût Annuel Estimé</h2>
+            
+            {% if financier.type == 'base' %}
+            <!-- Tarif Base -->
+            <div class="text-center mb-4">
+                <div class="text-5xl font-bold text-purple-600 mb-2">
+                    {{ financier.cout_total|floatformat:2 }} €
+                </div>
+                <p class="text-gray-600 text-lg">TTC par an (tarif Base)</p>
+                <p class="text-sm text-gray-500 mt-1">Puissance compteur : {{ financier.puissance }}</p>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div class="p-4 bg-gray-50 rounded-lg text-center">
+                    <p class="text-sm text-gray-600 mb-1">Abonnement</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ financier.abonnement|floatformat:2 }} €</p>
+                    <p class="text-xs text-gray-500 mt-1">par an</p>
+                </div>
+                <div class="p-4 bg-gray-50 rounded-lg text-center">
+                    <p class="text-sm text-gray-600 mb-1">Énergie consommée</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ financier.cout_energie|floatformat:2 }} €</p>
+                    <p class="text-xs text-gray-500 mt-1">{{ financier.prix_moyen_kwh }} €/kWh</p>
+                </div>
+            </div>
+            
+            <div class="mt-4 text-center text-xs text-gray-500">
+                Tarifs EDF réglementés 2024
+            </div>
+            
+            {% elif financier.type == 'hphc' %}
+            <!-- Tarif HP/HC -->
+            <div class="text-center mb-4">
+                <div class="text-5xl font-bold text-purple-600 mb-2">
+                    {{ financier.cout_total|floatformat:2 }} €
+                </div>
+                <p class="text-gray-600 text-lg">TTC par an (tarif HP/HC)</p>
+                <p class="text-sm text-gray-500 mt-1">Puissance compteur : {{ financier.puissance }}</p>
+                
+                {% if financier.economie_vs_base > 0 %}
+                <div class="mt-3 inline-block bg-green-100 text-green-800 px-4 py-2 rounded-full text-sm font-semibold">
+                    ✅ Économie de {{ financier.economie_vs_base|floatformat:2 }} € vs tarif Base
+                </div>
+                {% elif financier.economie_vs_base < 0 %}
+                <div class="mt-3 inline-block bg-orange-100 text-orange-800 px-4 py-2 rounded-full text-sm font-semibold">
+                    ⚠️ Surcoût de {{ financier.economie_vs_base|floatformat:2|slice:"1:" }} € vs tarif Base
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="grid grid-cols-3 gap-3 mb-4">
+                <div class="p-4 bg-gray-50 rounded-lg text-center">
+                    <p class="text-xs text-gray-600 mb-1">Abonnement</p>
+                    <p class="text-xl font-bold text-gray-900">{{ financier.abonnement|floatformat:2 }} €</p>
+                </div>
+                <div class="p-4 bg-red-50 rounded-lg text-center">
+                    <p class="text-xs text-red-600 font-semibold mb-1">Heures Pleines</p>
+                    <p class="text-xl font-bold text-red-700">{{ financier.cout_hp|floatformat:2 }} €</p>
+                    <p class="text-xs text-gray-500 mt-1">{{ financier.hp_kwh|floatformat:0 }} kWh ({{ financier.hp_pct }}%)</p>
+                </div>
+                <div class="p-4 bg-green-50 rounded-lg text-center">
+                    <p class="text-xs text-green-600 font-semibold mb-1">Heures Creuses</p>
+                    <p class="text-xl font-bold text-green-700">{{ financier.cout_hc|floatformat:2 }} €</p>
+                    <p class="text-xs text-gray-500 mt-1">{{ financier.hc_kwh|floatformat:0 }} kWh ({{ financier.hc_pct }}%)</p>
+                </div>
+            </div>
+            
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded text-sm text-blue-800">
+                <div class="flex items-start">
+                    <span class="mr-2">💡</span>
+                    <div>
+                        <strong>Heures Creuses = 22h-6h (8h/nuit)</strong><br>
+                        Prix HP : {{ financier.prix_hp }} €/kWh • Prix HC : {{ financier.prix_hc }} €/kWh<br>
+                        <span class="text-xs">Tarifs EDF réglementés 2024</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <!-- Répartition par poste (aperçu) -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">🔌 Répartition par poste</h2>
+            <div class="space-y-3">
+                {% for poste, data in consommation.repartition_postes.items %}
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <span class="text-sm font-semibold text-gray-700">
+                            {% if poste == 'chauffage' %}🔥 Chauffage
+                            {% elif poste == 'ecs' %}🚿 Eau chaude
+                            {% elif poste == 'electromenager' %}🧺 Électroménager
+                            {% elif poste == 'cuisson' %}🍳 Cuisson
+                            {% elif poste == 'audiovisuel' %}📺 Audiovisuel
+                            {% elif poste == 'eclairage' %}💡 Éclairage
+                            {% endif %}
+                        </span>
+                        <span class="text-sm font-semibold text-gray-900">
+                            {{ data.kwh|floatformat:0 }} kWh ({{ data.pourcentage }}%)
+                        </span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                        <div class="h-3 rounded-full transition-all duration-500"
+                             style="width: {{ data.pourcentage }}%; 
+                                    background: {% if poste == 'chauffage' %}#ef4444
+                                              {% elif poste == 'ecs' %}#3b82f6
+                                              {% elif poste == 'electromenager' %}#10b981
+                                              {% elif poste == 'cuisson' %}#f59e0b
+                                              {% elif poste == 'audiovisuel' %}#8b5cf6
+                                              {% elif poste == 'eclairage' %}#ec4899
+                                              {% endif %}">
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+<!-- Section Call-to-Action : Simulation Solaire -->
+<div class="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl p-8 border-2 border-orange-200 shadow-lg mt-8">
+    <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+        <!-- Texte et avantages -->
+        <div class="flex-1">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="bg-orange-500 rounded-full p-3">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900">
+                    Passez à l'étape suivante !
+                </h3>
+            </div>
+            
+            <p class="text-gray-700 mb-4 text-lg">
+                Maintenant que vous connaissez votre consommation 
+                (<strong class="text-orange-600">{{ consommation.consommation_annuelle_totale|floatformat:0 }} kWh/an</strong>),
+                découvrez combien vous pourriez économiser avec des panneaux solaires.
+            </p>
+            
+            <ul class="space-y-2 mb-6">
+                <li class="flex items-start gap-2 text-gray-700">
+                    <svg class="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span><strong>Dimensionnement automatique</strong> basé sur votre consommation</span>
+                </li>
+                <li class="flex items-start gap-2 text-gray-700">
+                    <svg class="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span><strong>Production solaire estimée</strong> pour votre localisation</span>
+                </li>
+                <li class="flex items-start gap-2 text-gray-700">
+                    <svg class="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span><strong>Calcul des économies</strong> et retour sur investissement</span>
+                </li>
+            </ul>
+            
+            <div class="bg-orange-100 border-l-4 border-orange-500 p-4 rounded">
+                <p class="text-sm text-orange-800">
+                    💡 <strong>Gratuit et sans engagement :</strong> Vos données seront automatiquement utilisées 
+                    pour vous proposer la meilleure configuration solaire.
+                </p>
+            </div>
+        </div>
+        
+        <!-- Bouton Call-to-Action -->
+        <div class="flex-shrink-0">
+            <a href="{% url 'frontend:simulation_from_consumption' consommation.pk %}" 
+               class="inline-flex items-center px-8 py-5 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-xl font-bold text-lg hover:from-orange-600 hover:to-yellow-600 transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105">
+                <svg class="w-7 h-7 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 4 0 11-8 0 4 4 0 018 0z"></path>
+                </svg>
+                <div class="text-left">
+                    <div>Simuler mon</div>
+                    <div>installation solaire</div>
+                </div>
+                <svg class="w-6 h-6 ml-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                </svg>
+            </a>
+            
+            <p class="text-center text-sm text-gray-600 mt-3">
+                ⚡ Résultat en 2 minutes
+            </p>
+        </div>
+    </div>
+</div>
+
+        <!-- Actions -->
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="{% url 'frontend:consumption_details' consommation.id %}" 
+               class="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold rounded-xl hover:from-purple-700 hover:to-blue-700 transition shadow-lg">
+                <span class="mr-2">📊</span>
+                Voir les détails complets
+            </a>
+            
+            <button onclick="window.location.href='{% url 'frontend:simulation_create' %}'"
+                    class="inline-flex items-center justify-center px-8 py-4 bg-white text-purple-600 font-semibold rounded-xl border-2 border-purple-600 hover:bg-purple-50 transition">
+                <span class="mr-2">🔄</span>
+                Nouvelle simulation
+            </button>
+        </div>
+        
+        <!-- Note informative -->
+        <div class="mt-8 text-center text-sm text-gray-500">
+            <p>💡 Ces estimations sont indicatives et basées sur des moyennes nationales.</p>
+            <p>Votre consommation réelle peut varier selon vos habitudes et équipements.</p>
+        </div>
+        
+    </div>
+</div>
+
+<style>
+/* Animation au chargement */
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.bg-white {
+    animation: slideInUp 0.6s ease-out;
+}
+
+.bg-white:nth-child(2) {
+    animation-delay: 0.1s;
+}
+
+.bg-white:nth-child(3) {
+    animation-delay: 0.2s;
+}
+
+.bg-white:nth-child(4) {
+    animation-delay: 0.3s;
+}
+</style>
+
+<script>
+// Animation des barres de progression au chargement
+document.addEventListener('DOMContentLoaded', function() {
+    // Forcer le reflow pour déclencher les animations
+    document.querySelectorAll('[style*="width:"]').forEach(el => {
+        const width = el.style.width;
+        el.style.width = '0%';
+        setTimeout(() => {
+            el.style.width = width;
+        }, 100);
+    });
+});
+</script>
+{% endblock %}

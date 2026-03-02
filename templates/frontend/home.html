@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}Solar Simulator - Simulez votre installation solaire{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500 gradient-animate">
+    <!-- Overlay avec motif -->
+    <div class="absolute inset-0 opacity-10">
+        <div class="absolute inset-0" style="background-image: url('data:image/svg+xml,%3Csvg width=&quot;60&quot; height=&quot;60&quot; viewBox=&quot;0 0 60 60&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Cg fill=&quot;none&quot; fill-rule=&quot;evenodd&quot;%3E%3Cg fill=&quot;%23ffffff&quot; fill-opacity=&quot;0.4&quot;%3E%3Cpath d=&quot;M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z&quot;/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
+    </div>
+    
+    <div class="relative z-10 container mx-auto px-4 text-center text-white">
+        <!-- Badge -->
+        <div class="inline-block mb-6 px-4 py-2 glass rounded-full text-sm font-semibold">
+            <i class="fas fa-satellite-dish mr-2"></i>
+            Données satellitaires PVGIS • 100% gratuit
+        </div>
+        
+        <!-- Titre principal -->
+        <h1 class="text-5xl md:text-7xl font-bold mb-6 animate-fade-in">
+            Simulez Votre Installation<br>
+            Solaire en <span class="text-yellow-300">2 Minutes</span>
+        </h1>
+        
+        <!-- Sous-titre -->
+        <p class="text-xl md:text-2xl mb-8 opacity-90 max-w-3xl mx-auto">
+            Estimez votre production, vos économies et recevez un rapport PDF complet.
+            Basé sur des données satellitaires réelles.
+        </p>
+        
+        <!-- Stats en ligne -->
+        <div class="flex flex-wrap justify-center gap-8 mb-12">
+            <div class="glass px-6 py-4 rounded-xl">
+                <div class="text-3xl font-bold">8760h</div>
+                <div class="text-sm opacity-80">Simulation horaire</div>
+            </div>
+            <div class="glass px-6 py-4 rounded-xl">
+                <div class="text-3xl font-bold">100%</div>
+                <div class="text-sm opacity-80">Gratuit</div>
+            </div>
+            <div class="glass px-6 py-4 rounded-xl">
+                <div class="text-3xl font-bold">&lt;2min</div>
+                <div class="text-sm opacity-80">Résultats</div>
+            </div>
+        </div>
+        
+        <!-- CTA Buttons -->
+        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <a href="{% url 'frontend:simulation_create' %}" 
+               class="group px-8 py-4 bg-white text-purple-600 rounded-xl hover:bg-gray-100 transition-all transform hover:scale-105 shadow-2xl font-semibold text-lg flex items-center">
+                <i class="fas fa-gift mr-2"></i>
+                Simulation Gratuite
+                <i class="fas fa-arrow-right ml-2 group-hover:translate-x-1 transition-transform"></i>
+            </a>
+            
+            <a href="#comment-ca-marche" 
+               class="px-8 py-4 glass rounded-xl hover:bg-white/20 transition-all border border-white/30 font-semibold text-lg">
+                <i class="fas fa-play-circle mr-2"></i>
+                Comment ça marche ?
+            </a>
+        </div>
+        
+        <!-- Scroll indicator -->
+        <div class="absolute bottom-10 left-1/2 transform -translate-x-1/2 animate-bounce">
+            <i class="fas fa-chevron-down text-3xl opacity-50"></i>
+        </div>
+    </div>
+</section>
+
+<!-- Section : Comment ça marche -->
+<section id="comment-ca-marche" class="py-20 bg-white">
+    <div class="container mx-auto px-4">
+        <div class="text-center mb-16">
+            <h2 class="text-4xl md:text-5xl font-bold mb-4">Comment ça marche ?</h2>
+            <p class="text-xl text-gray-600 max-w-2xl mx-auto">
+                Trois étapes simples pour obtenir votre simulation personnalisée
+            </p>
+        </div>
+        
+        <div class="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <!-- Étape 1 -->
+            <div class="relative group">
+                <div class="bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl p-8 text-white transform hover:scale-105 transition-all duration-300 shadow-xl">
+                    <div class="text-6xl mb-4">
+                        <i class="fas fa-map-marked-alt"></i>
+                    </div>
+                    <div class="absolute -top-4 -right-4 w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center font-bold text-purple-900 text-xl">
+                        1
+                    </div>
+                    <h3 class="text-2xl font-bold mb-3">Localisez</h3>
+                    <p class="opacity-90">
+                        Cliquez sur la carte ou entrez votre adresse. Nos satellites PVGIS analyseront l'irradiation solaire de votre toit.
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Étape 2 -->
+            <div class="relative group">
+                <div class="bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl p-8 text-white transform hover:scale-105 transition-all duration-300 shadow-xl">
+                    <div class="text-6xl mb-4">
+                        <i class="fas fa-sliders-h"></i>
+                    </div>
+                    <div class="absolute -top-4 -right-4 w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center font-bold text-purple-900 text-xl">
+                        2
+                    </div>
+                    <h3 class="text-2xl font-bold mb-3">Configurez</h3>
+                    <p class="opacity-90">
+                        Renseignez vos panneaux (nombre, orientation) et votre consommation. Notre IA optimise automatiquement.
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Étape 3 -->
+            <div class="relative group">
+                <div class="bg-gradient-to-br from-pink-600 to-orange-600 rounded-2xl p-8 text-white transform hover:scale-105 transition-all duration-300 shadow-xl">
+                    <div class="text-6xl mb-4">
+                        <i class="fas fa-file-pdf"></i>
+                    </div>
+                    <div class="absolute -top-4 -right-4 w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center font-bold text-purple-900 text-xl">
+                        3
+                    </div>
+                    <h3 class="text-2xl font-bold mb-3">Recevez</h3>
+                    <p class="opacity-90">
+                        Rapport PDF complet avec production, économies, ROI et graphiques. Instantané et gratuit !
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Section : Fonctionnalités -->
+<section class="py-20 bg-gray-50">
+    <div class="container mx-auto px-4">
+        <div class="text-center mb-16">
+            <h2 class="text-4xl md:text-5xl font-bold mb-4">Pourquoi nous choisir ?</h2>
+            <p class="text-xl text-gray-600 max-w-2xl mx-auto">
+                Des données précises, des calculs scientifiques, des résultats fiables
+            </p>
+        </div>
+        
+        <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <!-- Feature 1 -->
+            <div class="bg-white p-6 rounded-xl shadow-lg hover:shadow-2xl transition-all">
+                <div class="text-4xl mb-4 text-blue-600">
+                    <i class="fas fa-satellite"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-2">Données Satellitaires</h3>
+                <p class="text-gray-600">
+                    Irradiation solaire PVGIS basée sur 20 ans de données satellites
+                </p>
+            </div>
+            
+            <!-- Feature 2 -->
+            <div class="bg-white p-6 rounded-xl shadow-lg hover:shadow-2xl transition-all">
+                <div class="text-4xl mb-4 text-purple-600">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-2">Simulation 8760h</h3>
+                <p class="text-gray-600">
+                    Calcul heure par heure sur une année complète pour une précision maximale
+                </p>
+            </div>
+            
+            <!-- Feature 3 -->
+            <div class="bg-white p-6 rounded-xl shadow-lg hover:shadow-2xl transition-all">
+                <div class="text-4xl mb-4 text-pink-600">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-2">Analyse Complète</h3>
+                <p class="text-gray-600">
+                    Production, autoconsommation, ROI, économies sur 25 ans
+                </p>
+            </div>
+            
+            <!-- Feature 4 -->
+            <div class="bg-white p-6 rounded-xl shadow-lg hover:shadow-2xl transition-all">
+                <div class="text-4xl mb-4 text-orange-600">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-2">100% Gratuit</h3>
+                <p class="text-gray-600">
+                    Aucun frais caché, aucune inscription obligatoire. Transparent et gratuit.
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Section : CTA Final -->
+<section class="py-20 bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+    <div class="container mx-auto px-4 text-center">
+        <h2 class="text-4xl md:text-5xl font-bold mb-6">
+            Prêt à passer au solaire ?
+        </h2>
+        <p class="text-xl mb-8 opacity-90 max-w-2xl mx-auto">
+            Obtenez votre simulation personnalisée en moins de 2 minutes. Gratuit, sans engagement.
+        </p>
+        
+        <a href="{% url 'frontend:simulation_create' %}"
+           class="inline-block px-10 py-5 bg-white text-purple-600 rounded-xl hover:bg-gray-100 transition-all transform hover:scale-105 shadow-2xl font-bold text-xl">
+            <i class="fas fa-rocket mr-2"></i>
+            Commencer ma simulation
+            <i class="fas fa-arrow-right ml-2"></i>
+        </a>
+        
+        <div class="mt-8 text-sm opacity-75">
+            <i class="fas fa-lock mr-1"></i>
+            Vos données sont sécurisées et ne seront jamais partagées
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Détails Mode Expert - {{ consommation.consommation_annuelle_totale|floatformat:0 }} kWh/an{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-7xl">
+    
+    <!-- En-tête -->
+    <div class="mb-8">
+        <h1 class="text-4xl font-bold text-gray-900 mb-2">
+            📊 Analyse Détaillée
+        </h1>
+        <p class="text-gray-600">
+            Consommation : {{ consommation.consommation_annuelle_totale|floatformat:0 }} kWh/an • Coût : {{ financier.cout_total|floatformat:0 }}€/an
+        </p>
+    </div>
+    
+    <!-- Navigation -->
+    <div class="mb-6">
+        <a href="{% url 'frontend:consumption_result_expert' consommation.pk %}" 
+           class="text-blue-600 hover:text-blue-800">
+            ← Retour aux résultats
+        </a>
+    </div>
+    
+    <!-- Tableau complet des appareils -->
+    <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
+        <h2 class="text-2xl font-bold text-gray-900 mb-6">Liste complète des appareils</h2>
+        
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b-2 border-gray-300">
+                        <th class="text-left py-3 px-4">Appareil</th>
+                        <th class="text-center py-3 px-4">Catégorie</th>
+                        <th class="text-center py-3 px-4">Nombre</th>
+                        <th class="text-center py-3 px-4">Classe</th>
+                        <th class="text-right py-3 px-4">Conso annuelle</th>
+                        <th class="text-right py-3 px-4">Coût estimé</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for appareil in appareils %}
+                    <tr class="border-b border-gray-200 hover:bg-gray-50">
+                        <td class="py-3 px-4">
+                            <!-- Nom en gras - CORRIGÉ : sans filter split -->
+                            <div class="font-bold text-gray-900">
+                                {% with nom_parts=appareil.nom_affichage|cut:"(" %}
+                                    {{ nom_parts|truncatewords:10 }}
+                                {% endwith %}
+                            </div>
+                            <!-- Détails en gris -->
+                            <div class="text-sm text-gray-500 mt-1">
+                                {% if appareil.nombre > 1 %}{{ appareil.nombre }} unités{% endif %}
+                                {% if appareil.puissance_w %}{% if appareil.nombre > 1 %} • {% endif %}{{ appareil.puissance_w }}W{% endif %}
+                                {% if appareil.heures_jour %} • {{ appareil.heures_jour }}h/j{% endif %}
+                                {% if appareil.cycles_semaine %} • {{ appareil.cycles_semaine }} cycles/sem{% endif %}
+                            </div>
+                        </td>
+                        <td class="text-center py-3 px-4">
+                            <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                                {{ appareil.get_categorie_display }}
+                            </span>
+                        </td>
+                        <td class="text-center py-3 px-4">{{ appareil.nombre }}</td>
+                        <td class="text-center py-3 px-4">
+                            {% if appareil.classe_energetique %}
+                                <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-sm font-semibold">
+                                    {{ appareil.classe_energetique }}
+                                </span>
+                            {% else %}
+                                <span class="text-gray-400">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-right py-3 px-4">
+                            <span class="font-semibold">{{ appareil.consommation_annuelle|floatformat:0 }}</span> kWh/an
+                        </td>
+                        <td class="text-right py-3 px-4">
+                            {% if appareil.cout_annuel %}
+                                <span class="font-semibold">{{ appareil.cout_annuel|floatformat:0 }}</span>€/an
+                            {% else %}
+                                <span class="text-gray-400">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="border-t-2 border-gray-300 font-bold bg-gray-50">
+                        <td colspan="4" class="py-3 px-4">TOTAL</td>
+                        <td class="text-right py-3 px-4">{{ consommation.consommation_annuelle_totale|floatformat:0 }} kWh/an</td>
+                        <td class="text-right py-3 px-4">
+                            {% if financier.cout_total %}
+                                {{ financier.cout_total|floatformat:0 }}€/an
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Informations complémentaires -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <!-- Caractéristiques logement -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-xl font-bold text-gray-900 mb-4">🏠 Caractéristiques du logement</h3>
+            <dl class="space-y-2">
+                <div class="flex justify-between">
+                    <dt class="text-gray-600">Surface</dt>
+                    <dd class="font-semibold">{{ consommation.surface_habitable }} m²</dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-gray-600">Occupants</dt>
+                    <dd class="font-semibold">{{ consommation.nb_personnes }} personne{{ consommation.nb_personnes|pluralize }}</dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-gray-600">DPE</dt>
+                    <dd class="font-semibold">{{ consommation.dpe }}</dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-gray-600">Année construction</dt>
+                    <dd class="font-semibold">{{ consommation.annee_construction }}</dd>
+                </div>
+                {% if consommation.profil_usage %}
+                <div class="flex justify-between">
+                    <dt class="text-gray-600">Profil d'usage</dt>
+                    <dd class="font-semibold">{{ consommation.get_profil_usage_display }}</dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+        
+        <!-- Équipements -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-xl font-bold text-gray-900 mb-4">⚡ Équipements</h3>
+            <dl class="space-y-2">
+                <div class="flex justify-between">
+                    <dt class="text-gray-600">Chauffage</dt>
+                    <dd class="font-semibold">{{ consommation.get_type_chauffage_display }}</dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-gray-600">Eau chaude</dt>
+                    <dd class="font-semibold">{{ consommation.get_type_ecs_display }}</dd>
+                </div>
+                {% if consommation.type_cuisson %}
+                <div class="flex justify-between">
+                    <dt class="text-gray-600">Cuisson</dt>
+                    <dd class="font-semibold">{{ consommation.get_type_cuisson_display }}</dd>
+                </div>
+                {% endif %}
+                {% if consommation.puissance_compteur %}
+                <div class="flex justify-between">
+                    <dt class="text-gray-600">Puissance compteur</dt>
+                    <dd class="font-semibold">{{ consommation.puissance_compteur }}</dd>
+                </div>
+                {% endif %}
+                {% if consommation.type_contrat %}
+                <div class="flex justify-between">
+                    <dt class="text-gray-600">Type de contrat</dt>
+                    <dd class="font-semibold">{{ consommation.get_type_contrat_display }}</dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+    </div>
+    
+    <!-- Actions -->
+    <div class="flex gap-4 justify-center">
+        <a href="{% url 'frontend:consumption_result_expert' consommation.pk %}" 
+           class="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all">
+            ← Retour aux résultats
+        </a>
+        
+        <a href="{% url 'frontend:consumption_calculator_expert' %}" 
+           class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-all">
+            🔄 Nouvelle analyse
+        </a>
+    </div>
+</div>
+<script>
+// Nettoyer les noms d'appareils (retirer détails techniques)
+document.addEventListener('DOMContentLoaded', function() {
+    // Pour le tableau "Vos appareils détaillés"
+    document.querySelectorAll('.appareil-card .font-semibold').forEach(function(el) {
+        let nom = el.textContent.trim();
+        // Retirer tout après × ou (
+        if (nom.includes('×')) nom = nom.split('×')[0].trim();
+        else if (nom.includes('(')) nom = nom.split('(')[0].trim();
+        el.textContent = nom;
+    });
+    
+    // Pour le tableau "Liste complète des appareils"
+    document.querySelectorAll('table td .font-bold').forEach(function(el) {
+        let nom = el.textContent.trim();
+        if (nom.includes('×')) nom = nom.split('×')[0].trim();
+        else if (nom.includes('(')) nom = nom.split('(')[0].trim();
+        el.textContent = nom;
+    });
+});
+</script>
+{% endblock %}

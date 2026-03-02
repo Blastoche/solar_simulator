@@ -1,0 +1,1675 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Calculateur de Consommation - Mode Expert{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Même style que calculator V2 mais adapté pour 12 étapes */
+    .step-container {
+        display: none;
+    }
+    .step-container.active {
+        display: block;
+        animation: fadeIn 0.3s ease-in;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .progress-bar-custom {
+        height: 8px;
+        background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+        border-radius: 10px;
+        transition: width 0.3s ease;
+    }
+    
+    .card-appareil {
+        border: 2px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 1.5rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: white;
+    }
+    
+    .card-appareil:hover {
+        border-color: #3b82f6;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+        transform: translateY(-2px);
+    }
+    
+    .card-appareil.selected {
+        border-color: #3b82f6;
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    }
+    
+    .badge-classe {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+    
+    .classe-A3 { background: #10b981; color: white; }
+    .classe-A2 { background: #22c55e; color: white; }
+    .classe-A1 { background: #84cc16; color: white; }
+    .classe-A { background: #eab308; color: white; }
+    .classe-B { background: #f97316; color: white; }
+    
+    .input-group-expert {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin: 0.5rem 0;
+    }
+    
+    .appareil-item {
+        background: #f9fafb;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 0.75rem;
+        border-left: 4px solid #3b82f6;
+    }
+    
+    .btn-add-appareil {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background: #3b82f6;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-add-appareil:hover {
+        background: #2563eb;
+        transform: translateY(-1px);
+    }
+    
+    .tooltip-info {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        background: #3b82f6;
+        color: white;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 20px;
+        font-size: 12px;
+        cursor: help;
+        margin-left: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-4xl">
+    
+    <!-- En-tête -->
+    <div class="text-center mb-8">
+        <div class="inline-flex items-center gap-2 bg-purple-100 text-purple-700 px-4 py-2 rounded-full mb-4">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+            </svg>
+            <span class="font-semibold">MODE EXPERT</span>
+        </div>
+        
+        <h1 class="text-4xl font-bold text-gray-900 mb-2">
+            Calculateur de Consommation Expert
+        </h1>
+        <p class="text-gray-600 text-lg">
+            Analyse détaillée appareil par appareil pour une précision maximale
+        </p>
+    </div>
+    
+    <!-- Barre de progression -->
+    <div class="mb-8">
+        <div class="flex justify-between items-center mb-2">
+            <span class="text-sm font-medium text-gray-700" id="step-label">Étape 1 sur 12</span>
+            <span class="text-sm text-gray-500" id="progress-percent">8%</span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-2">
+            <div class="progress-bar-custom" id="progress-bar" style="width: 8%"></div>
+        </div>
+    </div>
+    
+    <!-- Formulaire -->
+    <form id="expertForm" method="post" action="{% url 'frontend:consumption_calculate_expert' %}">
+        {% csrf_token %}
+        
+        <!-- ============================================ -->
+        <!-- ÉTAPE 1 : LOGEMENT (Identique mode rapide) -->
+        <!-- ============================================ -->
+        <div class="step-container active" data-step="1">
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                    <span class="text-3xl">🏠</span>
+                    Votre logement
+                </h2>
+                
+                <!-- Surface -->
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-2">
+                        Surface habitable (m²)
+                    </label>
+                    <input type="number" name="surface" id="surface" 
+                           class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                           value="100" min="20" max="500" required>
+                </div>
+                
+                <!-- Nombre de personnes -->
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-2">
+                        Nombre de personnes
+                    </label>
+                    <input type="number" name="nb_personnes" id="nb_personnes"
+                           class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                           value="2" min="1" max="10" required>
+                </div>
+                
+                <!-- DPE -->
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-3">
+                        Classe énergétique (DPE)
+                    </label>
+                    <div class="grid grid-cols-7 gap-2">
+                        {% for classe in 'ABCDEFG' %}
+                        <label class="cursor-pointer">
+                            <input type="radio" name="dpe" value="{{ classe }}" 
+                                   {% if classe == 'D' %}checked{% endif %}
+                                   class="hidden peer" required>
+                            <div class="border-2 border-gray-300 rounded-lg p-3 text-center font-bold peer-checked:border-blue-500 peer-checked:bg-blue-50 hover:border-blue-300 transition-all">
+                                {{ classe }}
+                            </div>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <!-- Année construction -->
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-3">
+                        Année de construction
+                    </label>
+                    
+                    <div class="mb-4">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="annee_type" value="exacte" checked
+                                   onchange="toggleAnneeInput(true)">
+                            <span>Je connais l'année exacte</span>
+                        </label>
+                        <div id="annee-exacte-input" class="mt-2 ml-6">
+                            <input type="number" name="annee_construction_exacte" id="annee_exacte"
+                                   class="w-48 px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500"
+                                   placeholder="Ex: 2005" min="1900" max="2026">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="annee_type" value="plage"
+                                   onchange="toggleAnneeInput(false)">
+                            <span>Je connais la période de construction</span>
+                        </label>
+                        <div id="annee-plage-input" class="mt-2 ml-6" style="display: none;">
+                            <select name="annee_construction_plage" id="annee_plage"
+                                    class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500"
+                                    disabled>
+                                <option value="2021">2021 et après (RE2020)</option>
+                                <option value="2012">2013-2020 (RT2012)</option>
+                                <option value="2005" selected>2006-2012 (RT2005)</option>
+                                <option value="1988">1989-2005 (RT1988)</option>
+                                <option value="1974">1975-1988 (RT1974)</option>
+                                <option value="1950">Avant 1975</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Localisation -->
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-2">
+                        Localisation (pour zone climatique)
+                    </label>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-sm text-gray-600">Latitude</label>
+                            <input type="number" name="latitude" id="latitude" step="0.0001"
+                                   class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg"
+                                   value="48.8566" required>
+                        </div>
+                        <div>
+                            <label class="text-sm text-gray-600">Longitude</label>
+                            <input type="number" name="longitude" id="longitude" step="0.0001"
+                                   class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg"
+                                   value="2.3522" required>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-2">
+                        💡 Utilisez Google Maps pour trouver vos coordonnées GPS
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ============================================ -->
+        <!-- ÉTAPE 2 : CHAUFFAGE (Identique) -->
+        <!-- ============================================ -->
+        <div class="step-container" data-step="2">
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                    <span class="text-3xl">🔥</span>
+                    Chauffage
+                </h2>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-3">
+                        Type de chauffage principal
+                    </label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <label class="card-appareil">
+                            <input type="radio" name="type_chauffage" value="electrique" checked class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="text-2xl mb-2">⚡</div>
+                                <div class="font-semibold">Électrique</div>
+                                <div class="text-sm text-gray-600">Convecteurs, radiateurs</div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="type_chauffage" value="pompe_chaleur" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="text-2xl mb-2">♨️</div>
+                                <div class="font-semibold">Pompe à chaleur</div>
+                                <div class="text-sm text-gray-600">PAC air-air, air-eau</div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="type_chauffage" value="gaz" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="text-2xl mb-2">🔥</div>
+                                <div class="font-semibold">Gaz</div>
+                                <div class="text-sm text-gray-600">Chaudière gaz</div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="type_chauffage" value="autre" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="text-2xl mb-2">🌳</div>
+                                <div class="font-semibold">Autre</div>
+                                <div class="text-sm text-gray-600">Bois, fioul, collectif</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-2">
+                        Température de consigne (°C)
+                    </label>
+                    <input type="number" name="temperature_consigne" 
+                           class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                           value="19" min="15" max="23" step="0.5" required>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-3">
+                        Ventilation (VMC)
+                    </label>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <label class="card-appareil">
+                            <input type="radio" name="type_vmc" value="aucune" checked class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="font-semibold">Aucune</div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="type_vmc" value="simple_flux" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="font-semibold">VMC simple flux</div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="type_vmc" value="double_flux" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="font-semibold">VMC double flux</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ============================================ -->
+        <!-- ÉTAPE 3 : EAU CHAUDE SANITAIRE (Identique) -->
+        <!-- ============================================ -->
+        <div class="step-container" data-step="3">
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                    <span class="text-3xl">🚿</span>
+                    Eau chaude sanitaire
+                </h2>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-3">
+                        Type de production d'eau chaude
+                    </label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <label class="card-appareil">
+                            <input type="radio" name="type_ecs" value="ballon_electrique" checked class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="text-2xl mb-2">⚡</div>
+                                <div class="font-semibold">Ballon électrique</div>
+                                <div class="text-sm text-gray-600">Chauffe-eau cumulus</div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="type_ecs" value="thermodynamique" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="text-2xl mb-2">♨️</div>
+                                <div class="font-semibold">Thermodynamique</div>
+                                <div class="text-sm text-gray-600">Ballon avec PAC intégrée</div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="type_ecs" value="gaz" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="text-2xl mb-2">🔥</div>
+                                <div class="font-semibold">Gaz</div>
+                                <div class="text-sm text-gray-600">Chaudière ou chauffe-eau gaz</div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="type_ecs" value="solaire" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="text-2xl mb-2">☀️</div>
+                                <div class="font-semibold">Solaire</div>
+                                <div class="text-sm text-gray-600">Chauffe-eau solaire</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-2">
+                        Capacité du ballon (litres)
+                    </label>
+                    <input type="number" name="capacite_ecs" 
+                           class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                           value="200" min="50" max="500" step="10">
+                    <p class="text-sm text-gray-500 mt-2">
+                        💡 Généralement 50L par personne
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ============================================ -->
+        <!-- ÉTAPE 4 : CUISSON PLAQUES (Identique) -->
+        <!-- ============================================ -->
+        <div class="step-container" data-step="4">
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                    <span class="text-3xl">🍳</span>
+                    Cuisson - Plaques
+                </h2>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-3">
+                        Type de plaques de cuisson
+                    </label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <label class="card-appareil">
+                            <input type="radio" name="type_cuisson" value="induction" checked class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="text-2xl mb-2">⚡</div>
+                                <div class="font-semibold">Induction</div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="type_cuisson" value="vitroceramique" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="text-2xl mb-2">🔥</div>
+                                <div class="font-semibold">Vitrocéramique</div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="type_cuisson" value="gaz" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="text-2xl mb-2">🔥</div>
+                                <div class="font-semibold">Gaz</div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="type_cuisson" value="mixte" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="text-2xl mb-2">⚡🔥</div>
+                                <div class="font-semibold">Mixte</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ============================================ -->
+        <!-- ÉTAPE 5 : RÉFRIGÉRATION -->
+        <!-- ============================================ -->
+        <div class="step-container" data-step="5">
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                    <span class="text-3xl">❄️</span>
+                    Réfrigération
+                </h2>
+                
+                <!-- Réfrigérateur -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4">Réfrigérateur</h3>
+                    
+                    <div id="frigos-container">
+                        <div class="appareil-item frigo-item" data-index="0">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Type</label>
+                                    <select name="frigo_type_0" class="w-full px-3 py-2 border rounded-lg" onchange="updateFrigoEstimate(0)">
+                                        <option value="">Aucun</option>
+                                        <option value="simple">Simple (1 porte) - ~250 kWh/an</option>
+                                        <option value="combine" selected>Combiné (2 portes) - ~300 kWh/an</option>
+                                        <option value="americain">Américain - ~500 kWh/an</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Classe énergétique</label>
+                                    <select name="frigo_classe_0" class="w-full px-3 py-2 border rounded-lg" onchange="updateFrigoEstimate(0)">
+                                        <option value="A+++">A+++ (×0.70)</option>
+                                        <option value="A++" selected>A++ (×0.85)</option>
+                                        <option value="A+">A+ (×1.00)</option>
+                                        <option value="A">A (×1.15)</option>
+                                        <option value="B">B/C (×1.40)</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Nombre</label>
+                                    <input type="number" name="frigo_nombre_0" value="1" min="0" max="3" 
+                                           class="w-full px-3 py-2 border rounded-lg" onchange="updateFrigoEstimate(0)">
+                                </div>
+                            </div>
+                            <div class="mt-2 text-sm text-gray-600">
+                                <span id="frigo-estimate-0">≈ 255 kWh/an</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Congélateur -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold mb-4">Congélateur</h3>
+                    
+                    <div id="congelateurs-container">
+                        <div class="appareil-item congelateur-item" data-index="0">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Type</label>
+                                    <select name="congelateur_type_0" class="w-full px-3 py-2 border rounded-lg">
+                                        <option value="" selected>Aucun</option>
+                                        <option value="coffre">Coffre - ~250 kWh/an</option>
+                                        <option value="armoire">Armoire - ~300 kWh/an</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Classe énergétique</label>
+                                    <select name="congelateur_classe_0" class="w-full px-3 py-2 border rounded-lg">
+                                        <option value="A+++">A+++ (×0.70)</option>
+                                        <option value="A++" selected>A++ (×0.85)</option>
+                                        <option value="A+">A+ (×1.00)</option>
+                                        <option value="A">A (×1.15)</option>
+                                        <option value="B">B/C (×1.40)</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Nombre</label>
+                                    <input type="number" name="congelateur_nombre_0" value="0" min="0" max="2" 
+                                           class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Navigation -->
+        <div class="flex justify-between items-center mt-8">
+            <button type="button" id="prevBtn" onclick="changeStep(-1)" 
+                    class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-all"
+                    style="display: none;">
+                ← Précédent
+            </button>
+            
+            <div class="flex-1"></div>
+            
+            <button type="button" id="nextBtn" onclick="changeStep(1)"
+                    class="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all">
+                Suivant →
+            </button>
+            
+            <button type="submit" id="submitBtn"
+                    class="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all"
+                    style="display: none;">
+                🔬 Calculer (Mode Expert)
+            </button>
+        </div>
+</div>
+
+        <!-- ============================================ -->
+        <!-- ÉTAPE 6 : LAVAGE -->
+        <!-- ============================================ -->
+        <div class="step-container" data-step="6">
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                    <span class="text-3xl">🧺</span>
+                    Appareils de lavage
+                </h2>
+                
+                <!-- Lave-linge -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4">Lave-linge</h3>
+                    
+                    <div class="mb-4">
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" name="lave_linge_actif" value="1" checked
+                                   onchange="toggleLaveLinge(this.checked)" class="w-4 h-4">
+                            <span class="font-medium">J'ai un lave-linge</span>
+                        </label>
+                    </div>
+                    
+                    <div id="lave-linge-details" class="appareil-item">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Classe énergétique</label>
+                                <select name="lave_linge_classe" class="w-full px-3 py-2 border rounded-lg">
+                                    <option value="A+++">A+++ - 0.45 kWh/cycle</option>
+                                    <option value="A++" selected>A++ - 0.60 kWh/cycle</option>
+                                    <option value="A+">A+ - 0.80 kWh/cycle</option>
+                                    <option value="A">A/B - 1.00 kWh/cycle</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Cycles par semaine</label>
+                                <input type="number" name="lave_linge_cycles" value="4" min="0" max="15"
+                                       class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                        </div>
+                        <div class="mt-2 text-sm text-gray-600">
+                            ≈ 125 kWh/an (4 cycles/sem × 52 sem × 0.60 kWh)
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Lave-vaisselle -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4">Lave-vaisselle</h3>
+                    
+                    <div class="mb-4">
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" name="lave_vaisselle_actif" value="1" checked
+                                   onchange="toggleLaveVaisselle(this.checked)" class="w-4 h-4">
+                            <span class="font-medium">J'ai un lave-vaisselle</span>
+                        </label>
+                    </div>
+                    
+                    <div id="lave-vaisselle-details" class="appareil-item">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Classe énergétique</label>
+                                <select name="lave_vaisselle_classe" class="w-full px-3 py-2 border rounded-lg">
+                                    <option value="A+++">A+++ - 0.70 kWh/cycle</option>
+                                    <option value="A++" selected>A++ - 0.90 kWh/cycle</option>
+                                    <option value="A+">A+ - 1.10 kWh/cycle</option>
+                                    <option value="A">A/B - 1.40 kWh/cycle</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Cycles par semaine</label>
+                                <input type="number" name="lave_vaisselle_cycles" value="5" min="0" max="15"
+                                       class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                        </div>
+                        <div class="mt-2 text-sm text-gray-600">
+                            ≈ 234 kWh/an (5 cycles/sem × 52 sem × 0.90 kWh)
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Sèche-linge -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold mb-4">Sèche-linge</h3>
+                    
+                    <div class="mb-4">
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" name="seche_linge_actif" value="1"
+                                   onchange="toggleSecheLinge(this.checked)" class="w-4 h-4">
+                            <span class="font-medium">J'ai un sèche-linge</span>
+                        </label>
+                    </div>
+                    
+                    <div id="seche-linge-details" class="appareil-item" style="display: none;">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Type</label>
+                                <select name="seche_linge_type" class="w-full px-3 py-2 border rounded-lg">
+                                    <option value="pompe_chaleur_A+++">Pompe à chaleur A+++ - 1.5 kWh/cycle</option>
+                                    <option value="pompe_chaleur_A++" selected>Pompe à chaleur A++ - 2.0 kWh/cycle</option>
+                                    <option value="condensation_A+">Condensation A+ - 3.5 kWh/cycle</option>
+                                    <option value="evacuation">Évacuation - 4.5 kWh/cycle</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Cycles par semaine</label>
+                                <input type="number" name="seche_linge_cycles" value="3" min="0" max="10"
+                                       class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                        </div>
+                        <div class="mt-2 text-sm text-gray-600">
+                            ≈ 312 kWh/an (3 cycles/sem × 52 sem × 2.0 kWh)
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ============================================ -->
+        <!-- ÉTAPE 7 : FOUR -->
+        <!-- ============================================ -->
+        <div class="step-container" data-step="7">
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                    <span class="text-3xl">🍕</span>
+                    Four et cuisson au four
+                </h2>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-3">Type de four</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <label class="card-appareil">
+                            <input type="radio" name="type_four" value="micro_ondes" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="text-2xl mb-2">📻</div>
+                                <div class="font-semibold">Micro-ondes uniquement</div>
+                                <div class="text-sm text-gray-600">~100 kWh/an base</div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="type_four" value="four_electrique" checked class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="text-2xl mb-2">🔥</div>
+                                <div class="font-semibold">Four électrique</div>
+                                <div class="text-sm text-gray-600">~150-450 kWh/an selon usage</div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="type_four" value="four_combine" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="text-2xl mb-2">⚡🔥</div>
+                                <div class="font-semibold">Four combiné</div>
+                                <div class="text-sm text-gray-600">Four + micro-ondes</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-3">Fréquence d'utilisation</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <label class="card-appareil">
+                            <input type="radio" name="usage_four" value="rarement" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="font-semibold">Rarement</div>
+                                <div class="text-sm text-gray-600">< 1h par semaine</div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="usage_four" value="occasionnel" checked class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="font-semibold">Occasionnel</div>
+                                <div class="text-sm text-gray-600">1-3h par semaine</div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="usage_four" value="regulier" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="font-semibold">Régulier</div>
+                                <div class="text-sm text-gray-600">3-7h par semaine</div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="usage_four" value="intensif" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="font-semibold">Intensif</div>
+                                <div class="text-sm text-gray-600">> 7h par semaine</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ============================================ -->
+        <!-- ÉTAPE 8 : AUDIOVISUEL -->
+        <!-- ============================================ -->
+        <div class="step-container" data-step="8">
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                    <span class="text-3xl">📺</span>
+                    Audiovisuel et informatique
+                </h2>
+                
+                <!-- TV -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4">Télévision(s)</h3>
+                    
+                    <div id="tvs-container">
+                        <div class="appareil-item tv-item" data-index="0">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Taille</label>
+                                    <select name="tv_taille_0" class="w-full px-3 py-2 border rounded-lg">
+                                        <option value="petit">< 32" (50W)</option>
+                                        <option value="moyen">32-43" (80W)</option>
+                                        <option value="grand" selected>43-55" (120W)</option>
+                                        <option value="tres_grand">55-65" (150W)</option>
+                                        <option value="xxl">> 65" (200W)</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Technologie</label>
+                                    <select name="tv_techno_0" class="w-full px-3 py-2 border rounded-lg">
+                                        <option value="led" selected>LED (×1.0)</option>
+                                        <option value="oled">OLED (×1.2)</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Heures/jour</label>
+                                    <input type="number" name="tv_heures_0" value="4" min="0" max="24" step="0.5"
+                                           class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                            </div>
+                            <div class="mt-2 text-sm text-gray-600">
+                                ≈ 175 kWh/an (120W × 4h × 365j)
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="button" onclick="addTV()" class="btn-add-appareil mt-3">
+                        <span>+</span> Ajouter une TV
+                    </button>
+                </div>
+                
+                <!-- Box Internet -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4">Box Internet / Décodeur</h3>
+                    
+                    <div class="appareil-item">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Configuration</label>
+                                <select name="type_box" class="w-full px-3 py-2 border rounded-lg">
+                                    <option value="seule">Box seule - 150 kWh/an</option>
+                                    <option value="avec_decodeur" selected>Box + décodeur - 200 kWh/an</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="flex items-center gap-2 mt-6">
+                                    <input type="checkbox" name="box_eteinte_nuit" value="1" class="w-4 h-4">
+                                    <span class="text-sm">Éteinte la nuit (-30%)</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Ordinateurs -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4">Ordinateurs</h3>
+                    
+                    <div class="appareil-item">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Ordinateurs fixes</label>
+                                <input type="number" name="nb_ordis_fixes" value="0" min="0" max="5"
+                                       class="w-full px-3 py-2 border rounded-lg">
+                                <div class="text-xs text-gray-500 mt-1">200W chacun</div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Ordinateurs portables</label>
+                                <input type="number" name="nb_ordis_portables" value="2" min="0" max="5"
+                                       class="w-full px-3 py-2 border rounded-lg">
+                                <div class="text-xs text-gray-500 mt-1">50W chacun</div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Heures/jour</label>
+                                <input type="number" name="heures_ordi" value="6" min="0" max="24" step="0.5"
+                                       class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                        </div>
+                        <div class="mt-2 text-sm text-gray-600">
+                            ≈ 219 kWh/an (2 portables × 50W × 6h × 365j)
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Console -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold mb-4">Console de jeux</h3>
+                    
+                    <div class="mb-4">
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" name="console_actif" value="1"
+                                   onchange="toggleConsole(this.checked)" class="w-4 h-4">
+                            <span class="font-medium">J'ai une console de jeux</span>
+                        </label>
+                    </div>
+                    
+                    <div id="console-details" class="appareil-item" style="display: none;">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Type</label>
+                                <select name="type_console" class="w-full px-3 py-2 border rounded-lg">
+                                    <option value="ancienne">Ancienne génération - 150W</option>
+                                    <option value="actuelle" selected>Génération actuelle - 200W</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Heures/jour</label>
+                                <input type="number" name="heures_console" value="2" min="0" max="12" step="0.5"
+                                       class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ============================================ -->
+        <!-- ÉTAPE 9 : ÉCLAIRAGE -->
+        <!-- ============================================ -->
+        <div class="step-container" data-step="9">
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                    <span class="text-3xl">💡</span>
+                    Éclairage
+                </h2>
+                
+                <div class="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                    <p class="text-sm text-gray-700">
+                        💡 <strong>Conseil :</strong> Comptez toutes les ampoules de votre logement (salon, chambres, cuisine, SDB, couloirs, extérieur)
+                    </p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="appareil-item">
+                        <h3 class="font-semibold mb-3 flex items-center gap-2">
+                            <span class="text-2xl">💡</span>
+                            Ampoules LED
+                        </h3>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Nombre total</label>
+                            <input type="number" name="nb_led" value="30" min="0" max="100"
+                                   class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                                   onchange="updateEclairageEstimate()">
+                            <div class="text-xs text-gray-500 mt-1">Puissance moyenne : 10W chacune</div>
+                        </div>
+                    </div>
+                    
+                    <div class="appareil-item">
+                        <h3 class="font-semibold mb-3 flex items-center gap-2">
+                            <span class="text-2xl">🔆</span>
+                            Ampoules halogène
+                        </h3>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Nombre total</label>
+                            <input type="number" name="nb_halogene" value="5" min="0" max="50"
+                                   class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                                   onchange="updateEclairageEstimate()">
+                            <div class="text-xs text-gray-500 mt-1">Puissance moyenne : 50W chacune</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-2">
+                        Heures d'utilisation moyenne par jour
+                    </label>
+                    <input type="number" name="heures_eclairage" value="5" min="1" max="12" step="0.5"
+                           class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                           onchange="updateEclairageEstimate()">
+                    <p class="text-sm text-gray-500 mt-2">
+                        Généralement entre 4h (été) et 7h (hiver)
+                    </p>
+                </div>
+                
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <div class="font-semibold mb-2">Estimation consommation :</div>
+                    <div id="eclairage-estimate" class="text-lg text-blue-600">
+                        ≈ 1 004 kWh/an
+                    </div>
+                    <div class="text-sm text-gray-600 mt-1">
+                        (30 LED × 10W × 5h) + (5 halogène × 50W × 5h) × 365 jours
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- La suite dans le prochain message (étapes 10-12 + JavaScript) -->
+<!-- ============================================ -->
+        <!-- ÉTAPE 10 : ÉQUIPEMENTS SPÉCIAUX -->
+        <!-- ============================================ -->
+        <div class="step-container" data-step="10">
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                    <span class="text-3xl">🏊</span>
+                    Équipements spéciaux
+                </h2>
+                
+                <!-- PISCINE -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <span>🏊</span> Piscine
+                    </h3>
+                    
+                    <div class="mb-4">
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" name="piscine_active" value="1"
+                                   onchange="togglePiscine(this.checked)" class="w-4 h-4">
+                            <span class="font-medium">J'ai une piscine</span>
+                        </label>
+                    </div>
+                    
+                    <div id="piscine-details" class="space-y-4" style="display: none;">
+                        <!-- Pompe filtration -->
+                        <div class="appareil-item">
+                            <h4 class="font-semibold mb-3">Pompe de filtration</h4>
+                            
+                            <div class="mb-3">
+                                <label class="flex items-center gap-2">
+                                    <input type="radio" name="piscine_pompe_mode" value="connue"
+                                           onchange="togglePompePiscine('connue')" checked>
+                                    <span>Je connais la puissance</span>
+                                </label>
+                                <div id="pompe-puissance-connue" class="mt-2 ml-6">
+                                    <input type="number" name="piscine_puissance_pompe" placeholder="Ex: 1000"
+                                           class="w-48 px-3 py-2 border rounded-lg">
+                                    <span class="text-sm text-gray-600">Watts</span>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="flex items-center gap-2">
+                                    <input type="radio" name="piscine_pompe_mode" value="type"
+                                           onchange="togglePompePiscine('type')">
+                                    <span>Je ne connais pas la puissance</span>
+                                </label>
+                                <div id="pompe-type-choix" class="mt-2 ml-6" style="display: none;">
+                                    <select name="piscine_type_pompe" class="w-full px-3 py-2 border rounded-lg">
+                                        <option value="petite">Petite piscine hors-sol - 600W (probable pour votre piscine)</option>
+                                        <option value="standard" selected>Piscine enterrée standard - 1000W (probable pour votre piscine)</option>
+                                        <option value="grande">Grande piscine - 1500W (probable pour votre piscine)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-3">
+                                <label class="block text-sm font-medium mb-2">Heures de filtration par jour</label>
+                                <input type="number" name="piscine_heures_filtration" value="8" min="4" max="12"
+                                       class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                        </div>
+                        
+                        <!-- Chauffage piscine -->
+                        <div class="appareil-item">
+                            <h4 class="font-semibold mb-3">Chauffage piscine</h4>
+                            
+                            <div class="mb-3">
+                                <label class="flex items-center gap-2">
+                                    <input type="checkbox" name="piscine_chauffage_actif" value="1"
+                                           onchange="toggleChauffagePiscine(this.checked)" class="w-4 h-4">
+                                    <span>J'ai un chauffage de piscine électrique</span>
+                                </label>
+                            </div>
+                            
+                            <div id="chauffage-piscine-details" style="display: none;">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium mb-2">Type</label>
+                                        <select name="piscine_type_chauffage" class="w-full px-3 py-2 border rounded-lg">
+                                            <option value="pac" selected>Pompe à chaleur</option>
+                                            <option value="rechauffeur">Réchauffeur électrique</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="block text-sm font-medium mb-2">Puissance (W)</label>
+                                        <input type="number" name="piscine_puissance_chauffage" value="2000" step="100"
+                                               class="w-full px-3 py-2 border rounded-lg">
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="block text-sm font-medium mb-2">Heures/jour</label>
+                                        <input type="number" name="piscine_heures_chauffage" value="4" min="0" max="12"
+                                               class="w-full px-3 py-2 border rounded-lg">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Période utilisation -->
+                        <div class="appareil-item">
+                            <h4 class="font-semibold mb-3">Période d'utilisation</h4>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Du mois</label>
+                                    <select name="piscine_mois_debut" class="w-full px-3 py-2 border rounded-lg">
+                                        <option value="1">Janvier</option>
+                                        <option value="2">Février</option>
+                                        <option value="3">Mars</option>
+                                        <option value="4">Avril</option>
+                                        <option value="5" selected>Mai</option>
+                                        <option value="6">Juin</option>
+                                        <option value="7">Juillet</option>
+                                        <option value="8">Août</option>
+                                        <option value="9">Septembre</option>
+                                        <option value="10">Octobre</option>
+                                        <option value="11">Novembre</option>
+                                        <option value="12">Décembre</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Au mois</label>
+                                    <select name="piscine_mois_fin" class="w-full px-3 py-2 border rounded-lg">
+                                        <option value="1">Janvier</option>
+                                        <option value="2">Février</option>
+                                        <option value="3">Mars</option>
+                                        <option value="4">Avril</option>
+                                        <option value="5">Mai</option>
+                                        <option value="6">Juin</option>
+                                        <option value="7">Juillet</option>
+                                        <option value="8">Août</option>
+                                        <option value="9" selected>Septembre</option>
+                                        <option value="10">Octobre</option>
+                                        <option value="11">Novembre</option>
+                                        <option value="12">Décembre</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Robot nettoyeur -->
+                        <div class="appareil-item">
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" name="piscine_robot_actif" value="1" class="w-4 h-4">
+                                <span class="font-medium">Robot nettoyeur automatique (200W × 2h/sem)</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- SPA / JACUZZI -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <span>🛁</span> Spa / Jacuzzi
+                    </h3>
+                    
+                    <div class="mb-4">
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" name="spa_actif" value="1"
+                                   onchange="toggleSpa(this.checked)" class="w-4 h-4">
+                            <span class="font-medium">J'ai un spa ou jacuzzi</span>
+                        </label>
+                    </div>
+                    
+                    <div id="spa-details" class="space-y-4" style="display: none;">
+                        <div class="appareil-item">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Type</label>
+                                    <select name="type_spa" class="w-full px-3 py-2 border rounded-lg">
+                                        <option value="gonflable">Spa gonflable - ~2000 kWh/an</option>
+                                        <option value="rigide" selected>Spa rigide - ~3000 kWh/an</option>
+                                        <option value="interieur">Jacuzzi intérieur - ~4000 kWh/an</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Utilisation</label>
+                                    <select name="spa_utilisation" class="w-full px-3 py-2 border rounded-lg">
+                                        <option value="annee" selected>Toute l'année (×1.0)</option>
+                                        <option value="saison">Saisonnier 6 mois (×0.5)</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="flex items-center gap-2 mt-2">
+                                        <input type="checkbox" name="spa_temp_maintenue" value="1" checked class="w-4 h-4">
+                                        <span class="text-sm">Température maintenue en permanence</span>
+                                    </label>
+                                </div>
+                                
+                                <div>
+                                    <label class="flex items-center gap-2 mt-2">
+                                        <input type="checkbox" name="spa_couverture" value="1" checked class="w-4 h-4">
+                                        <span class="text-sm">Couverture isolante (-30%)</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- VÉHICULE ÉLECTRIQUE -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <span>🚗⚡</span> Véhicule électrique
+                    </h3>
+                    
+                    <div class="mb-4">
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" name="ve_actif" value="1"
+                                   onchange="toggleVE(this.checked)" class="w-4 h-4">
+                            <span class="font-medium">J'ai un véhicule électrique rechargé à domicile</span>
+                        </label>
+                    </div>
+                    
+                    <div id="ve-details" class="appareil-item" style="display: none;">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Consommation du véhicule</label>
+                                <select name="ve_conso_100km" class="w-full px-3 py-2 border rounded-lg">
+                                    <option value="14">Citadine - 14 kWh/100km</option>
+                                    <option value="18" selected>Berline - 18 kWh/100km</option>
+                                    <option value="22">SUV - 22 kWh/100km</option>
+                                    <option value="27">Grande berline/SUV - 27 kWh/100km</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Kilomètres par an</label>
+                                <input type="number" name="ve_km_an" value="15000" step="1000"
+                                       class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Type de recharge</label>
+                                <select name="ve_type_recharge" class="w-full px-3 py-2 border rounded-lg">
+                                    <option value="prise">Prise domestique 2.3kW (85% rendement)</option>
+                                    <option value="wallbox_7" selected>Wallbox 7.4kW (90% rendement)</option>
+                                    <option value="wallbox_11">Wallbox 11kW (92% rendement)</option>
+                                    <option value="wallbox_22">Wallbox 22kW (93% rendement)</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">% rechargé à domicile</label>
+                                <input type="number" name="ve_pct_domicile" value="100" min="0" max="100"
+                                       class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                            
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium mb-2">Programmation recharge</label>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <label class="card-appareil">
+                                        <input type="radio" name="ve_programmation" value="hc" checked class="hidden peer">
+                                        <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                            <div class="font-semibold text-sm">Heures creuses uniquement</div>
+                                            <div class="text-xs text-gray-600">22h-6h (optimal)</div>
+                                        </div>
+                                    </label>
+                                    
+                                    <label class="card-appareil">
+                                        <input type="radio" name="ve_programmation" value="mixte" class="hidden peer">
+                                        <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                            <div class="font-semibold text-sm">Dès le retour</div>
+                                            <div class="text-xs text-gray-600">Mixte HP/HC</div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3 bg-blue-50 p-3 rounded">
+                            <div class="text-sm text-gray-700">
+                                <strong>Estimation :</strong> 15 000 km/an × 18 kWh/100km = 2700 kWh véhicule
+                                <br>
+                                Avec pertes recharge (10%) : <strong>≈ 3000 kWh/an au compteur</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ============================================ -->
+        <!-- ÉTAPE 11 : PROFIL D'USAGE -->
+        <!-- ============================================ -->
+        <div class="step-container" data-step="11">
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                    <span class="text-3xl">⏰</span>
+                    Profil d'occupation
+                </h2>
+                
+                <div class="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                    <p class="text-sm text-gray-700">
+                        <strong>Pourquoi cette question ?</strong> Votre profil d'occupation permet d'optimiser la répartition Heures Pleines / Heures Creuses et de calculer les économies potentielles.
+                    </p>
+                </div>
+                
+                <div class="mb-8">
+                    <label class="block text-gray-700 font-semibold mb-4">
+                        Quel est votre profil d'occupation du logement ?
+                    </label>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <label class="card-appareil">
+                            <input type="radio" name="profil_usage" value="actif_absent" checked class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="text-2xl mb-2">💼</div>
+                                <div class="font-semibold">Actif absent</div>
+                                <div class="text-sm text-gray-600 mt-1">
+                                    Travail en journée (8h-18h)
+                                    <br>Logement vide la journée
+                                </div>
+                                <div class="text-xs text-green-600 mt-2 font-semibold">
+                                    ✓ Optimal pour HP/HC (35-40% en HC)
+                                </div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="profil_usage" value="teletravail_partiel" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="text-2xl mb-2">🏡💼</div>
+                                <div class="font-semibold">Télétravail partiel</div>
+                                <div class="text-sm text-gray-600 mt-1">
+                                    2-3 jours/semaine à domicile
+                                    <br>Présence partielle en journée
+                                </div>
+                                <div class="text-xs text-yellow-600 mt-2 font-semibold">
+                                    ⚡ Bon pour HP/HC (30-35% en HC)
+                                </div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="profil_usage" value="teletravail_complet" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="text-2xl mb-2">🏡</div>
+                                <div class="font-semibold">Télétravail complet</div>
+                                <div class="text-sm text-gray-600 mt-1">
+                                    Travail à domicile
+                                    <br>Présence quasi-constante
+                                </div>
+                                <div class="text-xs text-orange-600 mt-2 font-semibold">
+                                    ⚠️ Moyen pour HP/HC (25-30% en HC)
+                                </div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="profil_usage" value="retraite" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="text-2xl mb-2">🏠👴</div>
+                                <div class="font-semibold">Retraité / Présent</div>
+                                <div class="text-sm text-gray-600 mt-1">
+                                    Présence forte en journée
+                                    <br>Logement occupé toute la journée
+                                </div>
+                                <div class="text-xs text-red-600 mt-2 font-semibold">
+                                    ⚠️ Peu optimal pour HP/HC (20-25% en HC)
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-gray-700 font-semibold mb-2">
+                            Heure de lever habituelle
+                        </label>
+                        <input type="time" name="heure_lever" value="07:00"
+                               class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-gray-700 font-semibold mb-2">
+                            Heure de coucher habituelle
+                        </label>
+                        <input type="time" name="heure_coucher" value="23:00"
+                               class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ============================================ -->
+        <!-- ÉTAPE 12 : CONTRAT ÉLECTRICITÉ -->
+        <!-- ============================================ -->
+        <div class="step-container" data-step="12">
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                    <span class="text-3xl">⚡</span>
+                    Contrat d'électricité
+                </h2>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-3">
+                        Puissance du compteur
+                    </label>
+                    <div class="grid grid-cols-3 md:grid-cols-5 gap-3">
+                        <label class="card-appareil">
+                            <input type="radio" name="puissance_compteur" value="3kVA" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="font-semibold">3 kVA</div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="puissance_compteur" value="6kVA" checked class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="font-semibold">6 kVA</div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="puissance_compteur" value="9kVA" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="font-semibold">9 kVA</div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="puissance_compteur" value="12kVA" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="font-semibold">12 kVA</div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="puissance_compteur" value="15kVA" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="font-semibold">15 kVA</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-4">
+                        Type de contrat
+                    </label>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <label class="card-appareil">
+                            <input type="radio" name="type_contrat" value="base" checked class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="font-semibold text-lg mb-2">Base</div>
+                                <div class="text-sm text-gray-600 mb-2">
+                                    Prix unique 24h/24
+                                </div>
+                                <div class="text-2xl font-bold text-blue-600">
+                                    0.2516 €/kWh
+                                </div>
+                                <div class="text-xs text-gray-500 mt-2">
+                                    Simple et prévisible
+                                </div>
+                            </div>
+                        </label>
+                        
+                        <label class="card-appareil">
+                            <input type="radio" name="type_contrat" value="hphc" class="hidden peer">
+                            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                <div class="font-semibold text-lg mb-2">Heures Pleines / Heures Creuses</div>
+                                <div class="text-sm text-gray-600 mb-2">
+                                    Tarif réduit la nuit
+                                </div>
+                                <div class="flex justify-between mb-1">
+                                    <span class="text-sm font-semibold text-red-600">HP: 0.2700 €/kWh</span>
+                                    <span class="text-sm font-semibold text-green-600">HC: 0.2068 €/kWh</span>
+                                </div>
+                                <div class="text-xs text-gray-500">
+                                    <span class="tooltip-info" title="Les heures creuses sont généralement de 22h à 6h (8h par nuit), soit environ 33% du temps. Rentable si vous consommez >30% en HC.">ℹ️</span>
+                                    HC = 22h-6h (8h/nuit)
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-xl p-6">
+                    <div class="text-center">
+                        <div class="text-lg font-semibold text-gray-700 mb-2">
+                            🎯 Vous êtes prêt !
+                        </div>
+                        <p class="text-gray-600">
+                            Cliquez sur "Calculer" pour obtenir votre analyse détaillée
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+<!-- ============================================ -->
+<!-- JAVASCRIPT COMPLET -->
+<!-- ============================================ -->
+    </form>
+<script>
+// Variables globales
+let currentStep = 1;
+const totalSteps = 12;
+let tvCount = 1;
+
+// Navigation étapes
+function changeStep(direction) {
+    const steps = document.querySelectorAll('.step-container');
+    
+    // Validation avant de continuer
+    
+    steps[currentStep - 1].classList.remove('active');
+    currentStep += direction;
+    steps[currentStep - 1].classList.add('active');
+    
+    // Mise à jour progression
+    const progress = (currentStep / totalSteps) * 100;
+    document.getElementById('progress-bar').style.width = progress + '%';
+    document.getElementById('step-label').textContent = `Étape ${currentStep} sur ${totalSteps}`;
+    document.getElementById('progress-percent').textContent = Math.round(progress) + '%';
+    
+    // Boutons navigation
+    document.getElementById('prevBtn').style.display = currentStep === 1 ? 'none' : 'inline-block';
+    document.getElementById('nextBtn').style.display = currentStep === totalSteps ? 'none' : 'inline-block';
+    document.getElementById('submitBtn').style.display = currentStep === totalSteps ? 'inline-block' : 'none';
+    
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function validateStep(step) {
+    // Validation basique - peut être étendue
+    return true;
+}
+
+// Année construction
+function toggleAnneeInput(exacte) {
+    document.getElementById('annee-exacte-input').style.display = exacte ? 'block' : 'none';
+    document.getElementById('annee-plage-input').style.display = exacte ? 'none' : 'block';
+    document.getElementById('annee_exacte').disabled = !exacte;
+    document.getElementById('annee_plage').disabled = exacte;
+}
+
+// Estimation frigo
+function updateFrigoEstimate(index) {
+    const type = document.querySelector(`select[name="frigo_type_${index}"]`)?.value;
+    const classe = document.querySelector(`select[name="frigo_classe_${index}"]`)?.value;
+    const nombre = parseInt(document.querySelector(`input[name="frigo_nombre_${index}"]`)?.value) || 0;
+    
+    if (!type) return;
+    
+    const conso_base = { 'simple': 250, 'combine': 300, 'americain': 500 }[type] || 0;
+    const facteur = { 'A+++': 0.70, 'A++': 0.85, 'A+': 1.00, 'A': 1.15, 'B': 1.40 }[classe] || 1.0;
+    const total = Math.round(conso_base * facteur * nombre);
+    
+    const estimateEl = document.getElementById(`frigo-estimate-${index}`);
+    if (estimateEl) {
+        estimateEl.textContent = `≈ ${total} kWh/an`;
+    }
+}
+
+// Toggle appareils lavage
+function toggleLaveLinge(checked) {
+    document.getElementById('lave-linge-details').style.display = checked ? 'block' : 'none';
+}
+
+function toggleLaveVaisselle(checked) {
+    document.getElementById('lave-vaisselle-details').style.display = checked ? 'block' : 'none';
+}
+
+function toggleSecheLinge(checked) {
+    document.getElementById('seche-linge-details').style.display = checked ? 'block' : 'none';
+}
+
+// Ajouter TV
+function addTV() {
+    // Limite à 5 TVs
+    if (tvCount >= 5) {
+        alert('Maximum 5 téléviseurs');
+        return;
+    }
+    
+    const container = document.getElementById('tvs-container');
+    const newTV = document.createElement('div');
+    newTV.className = 'appareil-item tv-item';
+    newTV.setAttribute('data-index', tvCount);
+    newTV.innerHTML = `
+        <div class="flex justify-between items-center mb-3">
+            <h4 class="font-semibold">TV ${tvCount + 1}</h4>
+            <button type="button" onclick="removeTV(${tvCount})" class="text-red-600 hover:text-red-800">
+                ❌ Supprimer
+            </button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-sm font-medium mb-2">Taille</label>
+                <select name="tv_taille_${tvCount}" class="w-full px-3 py-2 border rounded-lg">
+                    <option value="petit">< 32" (50W)</option>
+                    <option value="moyen">32-43" (80W)</option>
+                    <option value="grand" selected>43-55" (120W)</option>
+                    <option value="tres_grand">55-65" (150W)</option>
+                    <option value="xxl">> 65" (200W)</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-2">Technologie</label>
+                <select name="tv_techno_${tvCount}" class="w-full px-3 py-2 border rounded-lg">
+                    <option value="led" selected>LED (×1.0)</option>
+                    <option value="oled">OLED (×1.2)</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-2">Heures/jour</label>
+                <input type="number" name="tv_heures_${tvCount}" value="4" min="0" max="24" step="0.5"
+                       class="w-full px-3 py-2 border rounded-lg">
+            </div>
+        </div>
+    `;
+    container.appendChild(newTV);
+    tvCount++;
+}
+
+function removeTV(index) {
+    const tvItem = document.querySelector(`.tv-item[data-index="${index}"]`);
+    if (tvItem) {
+        tvItem.remove();
+    }
+}
+
+// Toggle console
+function toggleConsole(checked) {
+    document.getElementById('console-details').style.display = checked ? 'block' : 'none';
+}
+
+// Estimation éclairage
+function updateEclairageEstimate() {
+    const nbLed = parseInt(document.querySelector('input[name="nb_led"]')?.value) || 0;
+    const nbHalogene = parseInt(document.querySelector('input[name="nb_halogene"]')?.value) || 0;
+    const heures = parseFloat(document.querySelector('input[name="heures_eclairage"]')?.value) || 5;
+    
+    const consoLed = nbLed * 10 * heures * 365 / 1000;
+    const consoHalogene = nbHalogene * 50 * heures * 365 / 1000;
+    const total = Math.round(consoLed + consoHalogene);
+    
+    const estimateEl = document.getElementById('eclairage-estimate');
+    if (estimateEl) {
+        estimateEl.textContent = `≈ ${total.toLocaleString()} kWh/an`;
+    }
+}
+
+// Toggle piscine
+function togglePiscine(checked) {
+    document.getElementById('piscine-details').style.display = checked ? 'block' : 'none';
+}
+
+function togglePompePiscine(mode) {
+    document.getElementById('pompe-puissance-connue').style.display = mode === 'connue' ? 'block' : 'none';
+    document.getElementById('pompe-type-choix').style.display = mode === 'type' ? 'block' : 'none';
+}
+
+function toggleChauffagePiscine(checked) {
+    document.getElementById('chauffage-piscine-details').style.display = checked ? 'block' : 'none';
+}
+
+// Toggle spa
+function toggleSpa(checked) {
+    document.getElementById('spa-details').style.display = checked ? 'block' : 'none';
+}
+
+// Toggle VE
+function toggleVE(checked) {
+    document.getElementById('ve-details').style.display = checked ? 'block' : 'none';
+}
+</script>
+{% endblock %}

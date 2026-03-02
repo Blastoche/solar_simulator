@@ -1,0 +1,242 @@
+{% extends 'frontend/pdf/base_pdf.html' %}
+{% load pdf_filters %}
+
+{% block title %}Rapport Consommation Expert - {{ consommation.created_at|date:"d/m/Y" }}{% endblock %}
+
+{% block content %}
+
+{# ============================================ #}
+{# PAGE 1 : PAGE DE COUVERTURE #}
+{# ============================================ #}
+
+<div class="header-cover">
+    <h1>📊 ANALYSE DE CONSOMMATION ÉLECTRIQUE</h1>
+    <div class="subtitle">Rapport Mode Expert</div>
+    <div class="date">Généré le {{ now|date:"d/m/Y à H:i" }}</div>
+</div>
+
+<div class="no-break">
+    <h2>🏠 Caractéristiques du Logement</h2>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="label">Surface</div>
+            <div class="value">{{ consommation.surface_habitable }}</div>
+            <div class="unit">m²</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Occupants</div>
+            <div class="value">{{ consommation.nombre_occupants }}</div>
+            <div class="unit">personne{% if consommation.nombre_occupants > 1 %}s{% endif %}</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">DPE</div>
+            <div class="value">{{ consommation.classe_dpe }}</div>
+            <div class="unit">Classe énergétique</div>
+        </div>
+    </div>
+</div>
+
+<div class="no-break">
+    <h2>⚡ Consommation Annuelle Totale</h2>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="label">Consommation</div>
+            <div class="value">{{ consommation.consommation_annuelle_totale|floatformat:0 }}</div>
+            <div class="unit">kWh/an</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Coût estimé</div>
+            <div class="value">{{ financier.cout_total|floatformat:0 }}</div>
+            <div class="unit">€/an</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Prix moyen kWh</div>
+            <div class="value">{{ financier.prix_moyen_kwh|floatformat:3 }}</div>
+            <div class="unit">€/kWh</div>
+        </div>
+    </div>
+</div>
+
+<div class="page-break"></div>
+
+{# ============================================ #}
+{# PAGE 2 : RÉPARTITION PAR CATÉGORIE #}
+{# ============================================ #}
+
+<h2>📈 Répartition de la Consommation</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>Catégorie</th>
+            <th class="text-right">Consommation (kWh/an)</th>
+            <th class="text-right">Part (%)</th>
+            <th class="text-right">Coût (€/an)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for cat, details in appareils_par_categorie.items %}
+        {% with total_cat=details|sum_consommation %}
+        <tr>
+            <td><strong>{{ cat }}</strong></td>
+            <td class="text-right">{{ total_cat|floatformat:0 }}</td>
+            <td class="text-right">{{ total_cat|percentage:consommation.consommation_annuelle_totale|floatformat:1 }}%</td>
+            <td class="text-right">{{ total_cat|multiply:financier.prix_moyen_kwh|floatformat:2 }}</td>
+        </tr>
+        {% endwith %}
+        {% endfor %}
+        <tr style="background: #e5e7eb; font-weight: bold;">
+            <td>TOTAL</td>
+            <td class="text-right">{{ consommation.consommation_annuelle_totale|floatformat:0 }}</td>
+            <td class="text-right">100%</td>
+            <td class="text-right">{{ financier.cout_total|floatformat:2 }}</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="info-box">
+    <div class="info-box-title">💡 Comparaison avec la moyenne nationale</div>
+    <p>Votre consommation : <strong>{{ consommation.consommation_annuelle_totale|floatformat:0 }} kWh/an</strong></p>
+    <p>Moyenne nationale (logement similaire) : <strong>~12 000 kWh/an</strong></p>
+    {% if consommation.consommation_annuelle_totale > 12000 %}
+    <p><span class="badge badge-warning">Consommation supérieure à la moyenne (+{{ consommation.consommation_annuelle_totale|subtract:12000|floatformat:0 }} kWh/an)</span></p>
+    {% else %}
+    <p><span class="badge badge-success">Consommation inférieure à la moyenne (-{{ 12000|subtract:consommation.consommation_annuelle_totale|floatformat:0 }} kWh/an)</span></p>
+    {% endif %}
+</div>
+
+<div class="page-break"></div>
+
+{# ============================================ #}
+{# PAGE 3 : DÉTAIL DES APPAREILS #}
+{# ============================================ #}
+
+<h2>🔌 Détail des Appareils</h2>
+
+<p>Liste complète des {{ nb_appareils }} appareil{% if nb_appareils > 1 %}s{% endif %} saisis, classés par consommation décroissante.</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Appareil</th>
+            <th>Catégorie</th>
+            <th class="text-right">Puissance</th>
+            <th class="text-right">Usage</th>
+            <th class="text-right">Conso (kWh/an)</th>
+            <th class="text-right">Coût (€/an)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for appareil in appareils %}
+        <tr>
+            <td>{{ appareil.nom }}</td>
+            <td><span class="badge badge-info">{{ appareil.get_categorie_display }}</span></td>
+            <td class="text-right">{{ appareil.puissance_w }} W</td>
+            <td class="text-right">{{ appareil.heures_jour }}h/j</td>
+            <td class="text-right"><strong>{{ appareil.consommation_annuelle|floatformat:0 }}</strong></td>
+            <td class="text-right">{{ appareil.consommation_annuelle|multiply:financier.prix_moyen_kwh|floatformat:2 }} €</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div class="info-box warning">
+    <div class="info-box-title">🔝 Top 3 des appareils les plus gourmands</div>
+    <ol>
+        {% for appareil in appareils|slice:":3" %}
+        <li><strong>{{ appareil.nom }}</strong> : {{ appareil.consommation_annuelle|floatformat:0 }} kWh/an ({{ appareil.consommation_annuelle|multiply:financier.prix_moyen_kwh|floatformat:2 }} €/an)</li>
+        {% endfor %}
+    </ol>
+</div>
+
+<div class="page-break"></div>
+
+{# ============================================ #}
+{# PAGE 4 : OPTIMISATION HP/HC #}
+{# ============================================ #}
+
+<h2>💰 Optimisation Heures Pleines / Heures Creuses</h2>
+
+{% if optim_hphc %}
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="label">Économie annuelle potentielle</div>
+        <div class="value">{{ optim_hphc.economie_annuelle|floatformat:0 }}</div>
+        <div class="unit">€/an</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Consommation HC optimisée</div>
+        <div class="value">{{ optim_hphc.conso_hc_optimisee|floatformat:0 }}</div>
+        <div class="unit">kWh/an</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Taux HC</div>
+        <div class="value">{{ optim_hphc.taux_hc|floatformat:0 }}</div>
+        <div class="unit">%</div>
+    </div>
+</div>
+
+<h3>Recommandations personnalisées</h3>
+<ul class="custom-list">
+    <li>Programmer le chauffe-eau en heures creuses (22h-6h)</li>
+    <li>Lancer le lave-linge et lave-vaisselle après 22h</li>
+    <li>Utiliser un programmateur pour les appareils électroménagers</li>
+    <li>Privilégier la recharge du véhicule électrique en heures creuses</li>
+</ul>
+
+{% else %}
+
+<div class="info-box">
+    <p>Aucune optimisation HP/HC n'a été calculée pour ce rapport.</p>
+</div>
+
+{% endif %}
+
+<div class="page-break"></div>
+
+{# ============================================ #}
+{# PAGE 5 : PROJECTION 10 ANS - VERSION CORRIGÉE #}
+{# ============================================ #}
+
+<h2>📊 Projection sur 10 ans</h2>
+
+<p>Évolution du coût de l'électricité avec une inflation estimée à <strong>3% par an</strong>.</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Année</th>
+            <th class="text-right">Prix kWh (€)</th>
+            <th class="text-right">Coût annuel (€)</th>
+            <th class="text-right">Cumul (€)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for annee in projection_10ans %}
+        <tr>
+            <td>{{ annee.annee }}</td>
+            <td class="text-right">{{ annee.prix_kwh|floatformat:3 }}</td>
+            <td class="text-right">{{ annee.cout_annuel|floatformat:0 }}</td>
+            <td class="text-right"><strong>{{ annee.cumul|floatformat:0 }}</strong></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% with last_projection=projection_10ans|last %}
+<div class="info-box success">
+    <div class="info-box-title">💡 Conseil d'installation solaire</div>
+    <p>Sur 10 ans, vous dépenserez environ <strong>{{ last_projection.cumul|floatformat:0 }} €</strong> en électricité.</p>
+    <p>Une installation solaire pourrait réduire cette facture de <strong>40 à 70%</strong> selon votre configuration.</p>
+    <p>→ Rendez-vous dans la section "Simulation Solaire" pour calculer votre potentiel d'économies ! ☀️</p>
+</div>
+{% endwith %}
+
+{# Footer #}
+<div class="footer">
+    <p>Rapport généré par Solar Simulator • www.solar-simulator.fr • Contact: contact@solar-simulator.fr</p>
+    <p>Les données présentées sont des estimations basées sur vos saisies. Les coûts réels peuvent varier.</p>
+</div>
+
+{% endblock %}
